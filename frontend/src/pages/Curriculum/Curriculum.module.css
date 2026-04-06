@@ -1,0 +1,249 @@
+.curriculum {
+  animation: fadeIn 0.4s ease;
+}
+
+/* Filter tabs */
+.filterRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filterTab {
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  transition: all var(--transition-fast);
+}
+
+.filterTab:hover {
+  border-color: var(--primary-light);
+  color: var(--primary-light);
+}
+
+.filterTabActive {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* Credit overview */
+.creditRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.creditCard {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  text-align: center;
+}
+
+.creditValue {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.creditLabel {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.creditTotal .creditValue { color: var(--text); }
+.creditDone .creditValue { color: var(--success); }
+.creditCurrent .creditValue { color: var(--warning); }
+.creditLeft .creditValue { color: var(--danger); }
+
+/* Semester groups */
+.semesterGroup {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.semesterHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  user-select: none;
+}
+
+.semesterHeader:hover {
+  background: var(--accent-light);
+}
+
+.semesterTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.semesterArrow {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  transition: transform var(--transition-fast);
+}
+
+.semesterArrowOpen {
+  transform: rotate(180deg);
+}
+
+.semesterProgress {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.semesterProgressDone {
+  color: var(--success);
+  font-weight: 700;
+}
+
+/* Course list */
+.courseList {
+  border-top: 1px solid var(--border-light);
+}
+
+.courseItem {
+  display: grid;
+  grid-template-columns: 30px 1fr 60px 110px 100px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition-fast);
+}
+
+.courseItem:last-child {
+  border-bottom: none;
+}
+
+.courseItem:hover {
+  background: var(--accent-light);
+}
+
+.courseIcon {
+  font-size: 1rem;
+  text-align: center;
+}
+
+.courseName {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.courseCode {
+  font-size: 0.7rem;
+  color: var(--text-light);
+  font-weight: 400;
+}
+
+.courseCredits {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.courseType {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.typeDaiCuong {
+  background: #e8f0fe;
+  color: #3b7dd8;
+}
+
+.typeCoSoNganh {
+  background: #fef3e8;
+  color: #d97706;
+}
+
+.typeChuyenNganh {
+  background: #e6f9ed;
+  color: #059669;
+}
+
+.typeTuChon {
+  background: #f3e8ff;
+  color: #8b5cf6;
+}
+
+.courseStatus {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.statusDone {
+  color: var(--success);
+}
+
+.statusInProgress {
+  color: #b8860b;
+}
+
+.statusPending {
+  color: var(--text-light);
+}
+
+.retakeBadge {
+  font-size: 0.6rem;
+  padding: 2px 6px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.loadingCenter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+@media (max-width: 768px) {
+  .creditRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .courseItem {
+    grid-template-columns: 24px 1fr 50px 80px;
+  }
+
+  .courseType {
+    display: none;
+  }
+}
