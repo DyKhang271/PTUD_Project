@@ -2,7 +2,49 @@
   animation: fadeIn 0.4s ease;
 }
 
-/* Filter tabs */
+.heroCard {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.heroLabel {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.72;
+  margin-bottom: 10px;
+}
+
+.heroTitle {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.heroMeta {
+  font-size: 0.88rem;
+  opacity: 0.8;
+}
+
+.heroNote {
+  max-width: 360px;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.heroSubnote {
+  margin-top: 8px;
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .filterRow {
   display: flex;
   gap: 8px;
@@ -32,7 +74,6 @@
   border-color: var(--primary);
 }
 
-/* Credit overview */
 .creditRow {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -62,12 +103,22 @@
   font-weight: 500;
 }
 
-.creditTotal .creditValue { color: var(--text); }
-.creditDone .creditValue { color: var(--success); }
-.creditCurrent .creditValue { color: var(--warning); }
-.creditLeft .creditValue { color: var(--danger); }
+.creditTotal .creditValue {
+  color: var(--text);
+}
 
-/* Semester groups */
+.creditDone .creditValue {
+  color: var(--success);
+}
+
+.creditCurrent .creditValue {
+  color: var(--warning);
+}
+
+.creditLeft .creditValue {
+  color: var(--danger);
+}
+
 .semesterGroup {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
@@ -121,7 +172,6 @@
   font-weight: 700;
 }
 
-/* Course list */
 .courseList {
   border-top: 1px solid var(--border-light);
 }
@@ -156,6 +206,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .courseCode {
@@ -180,24 +231,14 @@
   text-align: center;
 }
 
-.typeDaiCuong {
+.typeMandatory {
   background: #e8f0fe;
-  color: #3b7dd8;
+  color: #2563eb;
 }
 
-.typeCoSoNganh {
-  background: #fef3e8;
-  color: #d97706;
-}
-
-.typeChuyenNganh {
-  background: #e6f9ed;
-  color: #059669;
-}
-
-.typeTuChon {
+.typeElective {
   background: #f3e8ff;
-  color: #8b5cf6;
+  color: #7c3aed;
 }
 
 .courseStatus {
@@ -214,15 +255,19 @@
   color: #b8860b;
 }
 
+.statusRetake {
+  color: var(--danger);
+}
+
 .statusPending {
   color: var(--text-light);
 }
 
-.retakeBadge {
+.excludeBadge {
   font-size: 0.6rem;
   padding: 2px 6px;
-  background: var(--danger-bg);
-  color: var(--danger);
+  background: #fff8dd;
+  color: #a16207;
   border-radius: 8px;
   font-weight: 700;
 }
@@ -232,6 +277,12 @@
   align-items: center;
   justify-content: center;
   padding: 80px 0;
+}
+
+@media (max-width: 900px) {
+  .heroCard {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 768px) {

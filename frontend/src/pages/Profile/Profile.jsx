@@ -1,30 +1,37 @@
 import { useEffect, useState } from 'react';
-import { getStudent, getGradesSummary } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { getGradesSummary, getStudent } from '../../services/api';
 import styles from './Profile.module.css';
 
 export default function Profile() {
+  const { user } = useAuth();
   const [student, setStudent] = useState(null);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    Promise.all([getStudent(), getGradesSummary()])
-      .then(([stuRes, sumRes]) => {
-        setStudent(stuRes.data);
-        setSummary(sumRes.data);
+    if (!user?.mssv) return;
+
+    setLoading(true);
+    Promise.all([getStudent(user.mssv), getGradesSummary(user.mssv)])
+      .then(([studentRes, summaryRes]) => {
+        setStudent(studentRes.data);
+        setSummary(summaryRes.data);
         setLoading(false);
       })
       .catch(() => {
         setError('Không thể tải hồ sơ. Vui lòng thử lại.');
         setLoading(false);
       });
-  }, []);
+  }, [user?.mssv]);
 
   if (loading) {
     return (
       <div className={styles.profile}>
-        <div className={styles.loadingCenter}><div className="spinner" /></div>
+        <div className={styles.loadingCenter}>
+          <div className="spinner" />
+        </div>
       </div>
     );
   }
@@ -45,17 +52,20 @@ export default function Profile() {
 
   const getStatusStyle = (status) => {
     switch (status) {
-      case 'Đang học': return styles.statusActive;
-      case 'Bảo lưu': return styles.statusPaused;
-      case 'Tốt nghiệp': return styles.statusGrad;
-      default: return styles.statusActive;
+      case 'Đang học':
+        return styles.statusActive;
+      case 'Bảo lưu':
+        return styles.statusPaused;
+      case 'Tốt nghiệp':
+        return styles.statusGrad;
+      default:
+        return styles.statusActive;
     }
   };
 
   return (
     <div className={styles.profile}>
       <div className={styles.profileGrid}>
-        {/* Left card */}
         <div className={styles.cardLeft}>
           <div className={styles.avatarWrapper}>
             <div className={styles.avatar}>{getInitials(student.ho_ten)}</div>
@@ -70,7 +80,7 @@ export default function Profile() {
           <div className={styles.gpaSection}>
             <div className={styles.gpaStat}>
               <div className={styles.gpaValue}>{summary?.gpa_tich_luy?.toFixed(2)}</div>
-              <div className={styles.gpaLabel}>GPA Tích lũy</div>
+              <div className={styles.gpaLabel}>GPA tích lũy</div>
             </div>
             <div className={styles.gpaStat}>
               <div className={styles.gpaValue}>{summary?.xep_loai}</div>
@@ -79,7 +89,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Right sections */}
         <div className={styles.cardRight}>
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
@@ -120,8 +129,8 @@ export default function Profile() {
                 <span className={styles.infoValue}>{student.nganh}</span>
               </div>
               <div className={styles.infoItem}>
-                <span className={styles.infoLabel}>Chuyên ngành</span>
-                <span className={styles.infoValue}>{student.chuyen_nganh}</span>
+                <span className={styles.infoLabel}>Trình độ</span>
+                <span className={styles.infoValue}>{student.education_level}</span>
               </div>
             </div>
           </div>

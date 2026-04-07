@@ -1,6 +1,11 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from mock_data.student import STUDENT_DATA
+
+from student_data_store import (
+    get_available_accounts,
+    validate_parent_login,
+    validate_student_login,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -19,30 +24,38 @@ class ParentLogin(BaseModel):
 
 @router.post("/student-login")
 def student_login(data: StudentLogin):
-    # Mock: accept mssv=21110001, password=123456
-    if data.mssv == STUDENT_DATA["mssv"] and data.password == "123456":
+    student = validate_student_login(data.mssv, data.password)
+    if student:
         return {
             "success": True,
             "role": "student",
-            "student": STUDENT_DATA,
-            "token": "mock-student-token-xyz",
+            "student": student,
+            "token": f"student-token-{data.mssv}",
         }
     return {"success": False, "message": "Mã số sinh viên hoặc mật khẩu không đúng."}
 
 
 @router.post("/parent-login")
 def parent_login(data: ParentLogin):
-    # Mock: validate against student data
-    if (
-        data.ho_ten.strip().lower() == STUDENT_DATA["ho_ten"].lower()
-        and data.mssv == STUDENT_DATA["mssv"]
-        and data.ngay_sinh == STUDENT_DATA["ngay_sinh"]
-        and data.sdt == STUDENT_DATA["sdt"]
-    ):
+    student = validate_parent_login(
+        data.ho_ten,
+        data.mssv,
+        data.ngay_sinh,
+        data.sdt,
+    )
+    if student:
         return {
             "success": True,
             "role": "parent",
-            "student": STUDENT_DATA,
-            "token": "mock-parent-token-xyz",
+            "student": student,
+            "token": f"parent-token-{data.mssv}",
         }
-    return {"success": False, "message": "Thông tin xác thực không chính xác. Vui lòng kiểm tra lại."}
+    return {
+        "success": False,
+        "message": "Thông tin xác thực không chính xác. Vui lòng kiểm tra lại.",
+    }
+
+
+@router.get("/accounts")
+def get_accounts():
+    return get_available_accounts()

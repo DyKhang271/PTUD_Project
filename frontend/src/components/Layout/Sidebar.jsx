@@ -21,15 +21,17 @@ export default function Sidebar({ isOpen, onToggle }) {
   const [student, setStudent] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { isParent, role, logout } = useAuth();
+  const { isParent, logout, user } = useAuth();
 
   const menuItems = isParent ? PARENT_MENU : STUDENT_MENU;
 
   useEffect(() => {
-    getStudent()
+    if (!user?.mssv) return;
+
+    getStudent(user.mssv)
       .then((res) => setStudent(res.data))
       .catch(() => {});
-  }, []);
+  }, [user?.mssv]);
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -52,12 +54,9 @@ export default function Sidebar({ isOpen, onToggle }) {
         ☰
       </button>
 
-      {isOpen && (
-        <div className={styles.overlay} onClick={onToggle} />
-      )}
+      {isOpen && <div className={styles.overlay} onClick={onToggle} />}
 
       <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : ''}`}>
-        {/* Logo */}
         <div className={styles.logo}>
           <div className={styles.logoIcon}>🎓</div>
           <div className={styles.logoText}>
@@ -66,14 +65,10 @@ export default function Sidebar({ isOpen, onToggle }) {
           </div>
         </div>
 
-        {/* Role badge */}
         {isParent && (
-          <div className={styles.roleBadge}>
-            👨‍👩‍👧 Chế độ phụ huynh
-          </div>
+          <div className={styles.roleBadge}>👨‍👩‍👧 Chế độ phụ huynh</div>
         )}
 
-        {/* Student card — clickable to profile */}
         {student && (
           <div
             className={styles.studentCard}
@@ -85,9 +80,7 @@ export default function Sidebar({ isOpen, onToggle }) {
             tabIndex={0}
             title="Xem hồ sơ sinh viên"
           >
-            <div className={styles.studentAvatar}>
-              {getInitials(student.ho_ten)}
-            </div>
+            <div className={styles.studentAvatar}>{getInitials(student.ho_ten)}</div>
             <div className={styles.studentInfo}>
               <div className={styles.studentName}>{student.ho_ten}</div>
               <div className={styles.studentMssv}>{student.mssv}</div>
@@ -96,7 +89,6 @@ export default function Sidebar({ isOpen, onToggle }) {
           </div>
         )}
 
-        {/* Navigation */}
         <nav className={styles.nav}>
           <div className={styles.navLabel}>Menu chính</div>
           {menuItems.map((item) => (
@@ -134,7 +126,6 @@ export default function Sidebar({ isOpen, onToggle }) {
           )}
         </nav>
 
-        {/* Bottom */}
         <div className={styles.bottomSection}>
           <button className={styles.logoutBtn} onClick={handleLogout}>
             🚪 Đăng xuất

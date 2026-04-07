@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getStudent, getNotifications } from '../../services/api';
+import { getNotifications, getStudent } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './Topbar.module.css';
 
@@ -14,7 +14,7 @@ const PAGE_TITLES = {
 export default function Topbar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isParent, logout } = useAuth();
+  const { isParent, logout, user } = useAuth();
   const [student, setStudent] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [dateTime, setDateTime] = useState('');
@@ -22,17 +22,19 @@ export default function Topbar() {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    getStudent()
+    if (!user?.mssv) return;
+
+    getStudent(user.mssv)
       .then((res) => setStudent(res.data))
       .catch(() => {});
 
     getNotifications()
       .then((res) => {
-        const unread = res.data.filter((n) => !n.da_doc).length;
+        const unread = res.data.filter((notification) => !notification.da_doc).length;
         setUnreadCount(unread);
       })
       .catch(() => {});
-  }, []);
+  }, [user?.mssv]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -47,17 +49,19 @@ export default function Topbar() {
       };
       setDateTime(now.toLocaleDateString('vi-VN', options));
     };
+
     updateTime();
     const timer = setInterval(updateTime, 30000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setDropdownOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -84,19 +88,13 @@ export default function Topbar() {
       </div>
 
       <div className={styles.right}>
-        {isParent && (
-          <span className={styles.parentBadge}>👨‍👩‍👧 Phụ huynh</span>
-        )}
+        {isParent && <span className={styles.parentBadge}>👨‍👩‍👧 Phụ huynh</span>}
 
-        {/* Notification */}
         <button className={styles.notifBtn} title="Thông báo">
           🔔
-          {unreadCount > 0 && (
-            <span className={styles.badge}>{unreadCount}</span>
-          )}
+          {unreadCount > 0 && <span className={styles.badge}>{unreadCount}</span>}
         </button>
 
-        {/* User menu */}
         <div className={styles.userMenu} ref={dropdownRef}>
           <button
             className={styles.userBtn}
@@ -105,9 +103,7 @@ export default function Topbar() {
             <div className={styles.userAvatar}>
               {student ? getInitials(student.ho_ten) : '?'}
             </div>
-            <span className={styles.userName}>
-              {student?.ho_ten || 'Sinh viên'}
-            </span>
+            <span className={styles.userName}>{student?.ho_ten || 'Sinh viên'}</span>
             <span
               className={`${styles.userArrow} ${
                 dropdownOpen ? styles.userArrowOpen : ''

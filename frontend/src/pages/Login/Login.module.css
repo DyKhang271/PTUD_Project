@@ -283,6 +283,42 @@
   color: var(--primary);
 }
 
+.accountList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.accountItem {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(74, 144, 217, 0.15);
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.accountItem:hover {
+  transform: translateY(-1px);
+  border-color: var(--primary-light);
+}
+
+.accountName {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.accountMeta {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
 /* Parent login note */
 .parentNote {
   text-align: center;

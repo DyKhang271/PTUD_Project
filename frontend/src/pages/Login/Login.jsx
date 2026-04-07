@@ -1,61 +1,62 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { studentLogin, parentLogin } from '../../services/api';
+import {
+  getAvailableAccounts,
+  parentLogin,
+  studentLogin,
+} from '../../services/api';
 import styles from './Login.module.css';
 
-// Generate random CAPTCHA text
 function generateCaptchaText() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let text = '';
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 5; i += 1) {
     text += chars[Math.floor(Math.random() * chars.length)];
   }
   return text;
 }
 
-// Draw CAPTCHA on canvas
 function drawCaptcha(canvas, text) {
   const ctx = canvas.getContext('2d');
-  const w = canvas.width;
-  const h = canvas.height;
+  const width = canvas.width;
+  const height = canvas.height;
 
-  // Background
   ctx.fillStyle = '#f0f4f8';
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(0, 0, width, height);
 
-  // Noise lines
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 5; i += 1) {
     ctx.strokeStyle = `hsl(${Math.random() * 360}, 40%, 75%)`;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(Math.random() * w, Math.random() * h);
+    ctx.moveTo(Math.random() * width, Math.random() * height);
     ctx.bezierCurveTo(
-      Math.random() * w, Math.random() * h,
-      Math.random() * w, Math.random() * h,
-      Math.random() * w, Math.random() * h
+      Math.random() * width,
+      Math.random() * height,
+      Math.random() * width,
+      Math.random() * height,
+      Math.random() * width,
+      Math.random() * height,
     );
     ctx.stroke();
   }
 
-  // Noise dots
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 40; i += 1) {
     ctx.fillStyle = `hsl(${Math.random() * 360}, 30%, 70%)`;
     ctx.beginPath();
-    ctx.arc(Math.random() * w, Math.random() * h, 1.5, 0, Math.PI * 2);
+    ctx.arc(Math.random() * width, Math.random() * height, 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Text
   ctx.font = 'bold 28px Inter, Arial, sans-serif';
   ctx.textBaseline = 'middle';
   const totalWidth = ctx.measureText(text).width;
-  let startX = (w - totalWidth) / 2;
+  const startX = (width - totalWidth) / 2;
 
-  for (let i = 0; i < text.length; i++) {
+  for (let i = 0; i < text.length; i += 1) {
     ctx.save();
-    const x = startX + ctx.measureText(text.substring(0, i)).width + 12 * i / text.length;
-    const y = h / 2 + (Math.random() - 0.5) * 10;
+    const x = startX + ctx.measureText(text.substring(0, i)).width + (12 * i) / text.length;
+    const y = height / 2 + (Math.random() - 0.5) * 10;
     const angle = (Math.random() - 0.5) * 0.4;
     ctx.translate(x + 6, y);
     ctx.rotate(angle);
@@ -69,20 +70,18 @@ export default function Login() {
   const [activeTab, setActiveTab] = useState('student');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [accounts, setAccounts] = useState([]);
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  // Student form
   const [mssv, setMssv] = useState('');
   const [password, setPassword] = useState('');
 
-  // Parent form
   const [pHoTen, setPHoTen] = useState('');
   const [pMssv, setPMssv] = useState('');
   const [pNgaySinh, setPNgaySinh] = useState('');
   const [pSdt, setPSdt] = useState('');
 
-  // CAPTCHA
   const [captchaText, setCaptchaText] = useState('');
   const [captchaInput, setCaptchaInput] = useState('');
   const captchaRef = useRef(null);
@@ -98,16 +97,34 @@ export default function Login() {
 
   useEffect(() => {
     refreshCaptcha();
+    getAvailableAccounts()
+      .then((res) => setAccounts(res.data))
+      .catch(() => setAccounts([]));
   }, [refreshCaptcha]);
 
-  // Redraw when tab changes
   useEffect(() => {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       if (captchaRef.current && captchaText) {
         drawCaptcha(captchaRef.current, captchaText);
       }
     }, 50);
+
+    return () => clearTimeout(timer);
   }, [activeTab, captchaText]);
+
+  const fillStudentAccount = (account) => {
+    setMssv(account.mssv);
+    setPassword(account.password);
+    setError('');
+  };
+
+  const fillParentAccount = (account) => {
+    setPHoTen(account.ho_ten);
+    setPMssv(account.mssv);
+    setPNgaySinh(account.ngay_sinh);
+    setPSdt(account.sdt);
+    setError('');
+  };
 
   const handleStudentLogin = async (e) => {
     e.preventDefault();
@@ -177,34 +194,35 @@ export default function Login() {
     <div className={styles.loginPage}>
       <div className={styles.loginContainer}>
         <div className={styles.loginCard}>
-          {/* Header */}
           <div className={styles.loginHeader}>
             <div className={styles.loginLogo}>🎓</div>
             <div className={styles.loginTitle}>IUH Portal</div>
             <div className={styles.loginSubtitle}>Cổng thông tin sinh viên</div>
           </div>
 
-          {/* Tabs */}
           <div className={styles.tabs}>
             <button
               className={`${styles.tab} ${activeTab === 'student' ? styles.tabActive : ''}`}
-              onClick={() => { setActiveTab('student'); setError(''); }}
+              onClick={() => {
+                setActiveTab('student');
+                setError('');
+              }}
             >
               🎒 Sinh viên
             </button>
             <button
               className={`${styles.tab} ${activeTab === 'parent' ? styles.tabActive : ''}`}
-              onClick={() => { setActiveTab('parent'); setError(''); }}
+              onClick={() => {
+                setActiveTab('parent');
+                setError('');
+              }}
             >
               👨‍👩‍👧 Phụ huynh
             </button>
           </div>
 
-          {/* Form */}
           <div className={styles.formBody}>
-            {error && (
-              <div className={styles.formError}>⚠️ {error}</div>
-            )}
+            {error && <div className={styles.formError}>⚠️ {error}</div>}
 
             {activeTab === 'student' ? (
               <form onSubmit={handleStudentLogin}>
@@ -213,7 +231,7 @@ export default function Login() {
                   <input
                     className={styles.formInput}
                     type="text"
-                    placeholder="Nhập MSSV (VD: 21110001)"
+                    placeholder="Nhập MSSV"
                     value={mssv}
                     onChange={(e) => setMssv(e.target.value)}
                     autoFocus
@@ -230,7 +248,6 @@ export default function Login() {
                   />
                 </div>
 
-                {/* CAPTCHA */}
                 <label className={styles.formLabel}>Mã xác thực</label>
                 <div className={styles.captchaRow}>
                   <canvas
@@ -268,7 +285,22 @@ export default function Login() {
                 </button>
 
                 <div className={styles.loginHint}>
-                  <strong>Demo:</strong> MSSV: <strong>21110001</strong> | Mật khẩu: <strong>123456</strong>
+                  <strong>2 tài khoản sinh viên hiện có</strong>
+                  <div className={styles.accountList}>
+                    {accounts.map((account) => (
+                      <button
+                        key={account.mssv}
+                        type="button"
+                        className={styles.accountItem}
+                        onClick={() => fillStudentAccount(account)}
+                      >
+                        <span className={styles.accountName}>{account.ho_ten}</span>
+                        <span className={styles.accountMeta}>
+                          {account.mssv} • mật khẩu: {account.password}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </form>
             ) : (
@@ -299,7 +331,7 @@ export default function Login() {
                   <input
                     className={styles.formInput}
                     type="text"
-                    placeholder="DD/MM/YYYY (VD: 15/03/2003)"
+                    placeholder="DD/MM/YYYY"
                     value={pNgaySinh}
                     onChange={(e) => setPNgaySinh(e.target.value)}
                   />
@@ -309,13 +341,12 @@ export default function Login() {
                   <input
                     className={styles.formInput}
                     type="text"
-                    placeholder="Nhập SĐT sinh viên"
+                    placeholder="Nhập số điện thoại"
                     value={pSdt}
                     onChange={(e) => setPSdt(e.target.value)}
                   />
                 </div>
 
-                {/* CAPTCHA */}
                 <label className={styles.formLabel}>Mã xác thực</label>
                 <div className={styles.captchaRow}>
                   <canvas
@@ -353,16 +384,31 @@ export default function Login() {
                 </button>
 
                 <div className={styles.loginHint}>
-                  <strong>Demo:</strong> Tên: <strong>Nguyễn Văn An</strong> | MSSV: <strong>21110001</strong> | Ngày sinh: <strong>15/03/2003</strong> | SĐT: <strong>0901234567</strong>
+                  <strong>Thông tin phụ huynh dùng để tra cứu</strong>
+                  <div className={styles.accountList}>
+                    {accounts.map((account) => (
+                      <button
+                        key={`${account.mssv}-parent`}
+                        type="button"
+                        className={styles.accountItem}
+                        onClick={() => fillParentAccount(account)}
+                      >
+                        <span className={styles.accountName}>{account.ho_ten}</span>
+                        <span className={styles.accountMeta}>
+                          {account.mssv} • {account.ngay_sinh} • {account.sdt}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </form>
             )}
           </div>
 
-          {/* Parent note */}
           {activeTab === 'student' && (
             <div className={styles.parentNote}>
-              Phụ huynh muốn theo dõi kết quả học tập?{' '}
+              Phụ huynh muốn theo dõi kết quả học tập?
+              {' '}
               <span className={styles.parentNoteLink} onClick={() => setActiveTab('parent')}>
                 Đăng nhập tại đây →
               </span>
@@ -371,7 +417,7 @@ export default function Login() {
         </div>
 
         <div className={styles.loginFooter}>
-          © 2025 IUH Student Portal — Trường ĐH Công nghiệp TP.HCM
+          © 2026 IUH Student Portal - Trường ĐH Công nghiệp TP.HCM
         </div>
       </div>
     </div>
