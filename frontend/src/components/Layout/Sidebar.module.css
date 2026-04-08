@@ -259,3 +259,9 @@
     display: block;
   }
 }
+
+@media (min-width: 769px) {
+  .sidebarCollapsed {
+    transform: translateX(-100%);
+  }
+}

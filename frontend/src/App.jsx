@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Profile from './pages/Profile/Profile';
 import Grades from './pages/Grades/Grades';
 import Curriculum from './pages/Curriculum/Curriculum';
+import AdminDashboard from './pages/Admin/AdminDashboard';
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -30,29 +31,22 @@ function ProtectedRoute() {
 
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const { isParent } = useAuth();
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="layout-wrapper">
       <Sidebar
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        isDesktopCollapsed={desktopCollapsed}
       />
-      <div
-        style={{
-          flex: 1,
-          marginLeft: 'var(--sidebar-width)',
-          transition: 'margin-left 0.25s ease',
-        }}
-      >
-        <Topbar />
-        <main
-          style={{
-            marginTop: 'var(--topbar-height)',
-            padding: '24px 28px',
-            minHeight: 'calc(100vh - var(--topbar-height))',
-          }}
-        >
+      <div className={`main-content ${desktopCollapsed ? 'collapsed' : ''}`}>
+        <Topbar 
+          onToggleSidebar={() => setDesktopCollapsed(!desktopCollapsed)} 
+          isDesktopCollapsed={desktopCollapsed}
+        />
+        <main className="main-content-inner">
           <Outlet />
         </main>
       </div>
@@ -62,23 +56,47 @@ function Layout() {
   );
 }
 
+function AdminLayout() {
+  const { logout } = useAuth();
+  return (
+    <div className="layout-wrapper" style={{ display: 'block', backgroundColor: '#f0f2f5' }}>
+      <div style={{ background: '#fff', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+        <h1 style={{ fontSize: '1.25rem', color: 'var(--primary)', fontWeight: 'bold' }}>🛡️ IUH Portal - Phân Quyền Quản Trị</h1>
+        <button onClick={logout} style={{ padding: '8px 16px', background: 'var(--bg-hover)', border: 'none', borderRadius: 'var(--radius)', cursor: 'pointer', fontWeight: 'bold', color: 'var(--text)' }}>
+          Đăng xuất
+        </button>
+      </div>
+      <main style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
 function AppRoutes() {
-  const { isParent } = useAuth();
+  const { isParent, isAdmin } = useAuth();
 
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute />}>
-        <Route element={<Layout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/grades" element={<Grades />} />
-          {/* Curriculum only for students */}
-          {!isParent && (
-            <Route path="/curriculum" element={<Curriculum />} />
-          )}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
+        {isAdmin ? (
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Route>
+        ) : (
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/grades" element={<Grades />} />
+            {/* Curriculum only for students */}
+            {!isParent && (
+              <Route path="/curriculum" element={<Curriculum />} />
+            )}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
+        )}
       </Route>
     </Routes>
   );

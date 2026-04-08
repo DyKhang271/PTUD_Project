@@ -5,19 +5,19 @@ import { useAuth } from '../../contexts/AuthContext';
 import styles from './Sidebar.module.css';
 
 const STUDENT_MENU = [
-  { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
-  { path: '/profile', icon: '👤', label: 'Hồ sơ' },
-  { path: '/grades', icon: '📊', label: 'Bảng điểm' },
-  { path: '/curriculum', icon: '📚', label: 'Chương trình khung' },
+  { path: '/dashboard', label: 'Trang chủ' },
+  { path: '/profile', label: 'Hồ sơ' },
+  { path: '/grades', label: 'Bảng điểm' },
+  { path: '/curriculum', label: 'Chương trình khung' },
 ];
 
 const PARENT_MENU = [
-  { path: '/dashboard', icon: '🏠', label: 'Trang chủ' },
-  { path: '/profile', icon: '👤', label: 'Hồ sơ sinh viên' },
-  { path: '/grades', icon: '📊', label: 'Bảng điểm' },
+  { path: '/dashboard', label: 'Trang chủ' },
+  { path: '/profile', label: 'Hồ sơ sinh viên' },
+  { path: '/grades', label: 'Bảng điểm' },
 ];
 
-export default function Sidebar({ isOpen, onToggle }) {
+export default function Sidebar({ isOpen, onToggle, isDesktopCollapsed }) {
   const [student, setStudent] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -56,7 +56,7 @@ export default function Sidebar({ isOpen, onToggle }) {
 
       {isOpen && <div className={styles.overlay} onClick={onToggle} />}
 
-      <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : ''}`}>
+      <aside className={`${styles.sidebar} ${isOpen ? styles.sidebarOpen : ''} ${isDesktopCollapsed ? styles.sidebarCollapsed : ''}`}>
         <div className={styles.logo}>
           <div className={styles.logoIcon}>🎓</div>
           <div className={styles.logoText}>
@@ -102,7 +102,6 @@ export default function Sidebar({ isOpen, onToggle }) {
                 if (window.innerWidth <= 768) onToggle();
               }}
             >
-              <span className={styles.navIcon}>{item.icon}</span>
               <span className={styles.navText}>{item.label}</span>
             </NavLink>
           ))}
@@ -119,7 +118,6 @@ export default function Sidebar({ isOpen, onToggle }) {
                 role="button"
                 tabIndex={0}
               >
-                <span className={styles.navIcon}>🤖</span>
                 <span className={styles.navText}>Tư vấn AI</span>
               </div>
             </>

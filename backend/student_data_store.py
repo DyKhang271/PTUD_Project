@@ -8,6 +8,13 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data_json"
 
+ADMIN_USERS = {
+    "admin": {
+        "password": "admin",
+        "name": "Quản trị viên"
+    }
+}
+
 ACCOUNT_METADATA = {
     "23630781": {
         "password": "23630781",
@@ -259,7 +266,13 @@ def _build_curriculum_payload(record: dict, student_payload: dict) -> dict:
     }
 
 
+STUDENT_DB = {}
+
 def get_student_records() -> dict[str, dict]:
+    global STUDENT_DB
+    if STUDENT_DB:
+        return STUDENT_DB
+
     records: dict[str, dict] = {}
 
     for data_file in DATA_FILES:
@@ -274,22 +287,105 @@ def get_student_records() -> dict[str, dict]:
             "curriculum": _build_curriculum_payload(raw, student_payload),
         }
 
-    return records
+    STUDENT_DB = records
+    return STUDENT_DB
 
 
 def get_available_accounts() -> list[dict]:
+    get_student_records()
     accounts = []
-    for mssv, record in get_student_records().items():
+    for mssv, meta in ACCOUNT_METADATA.items():
+        db_student = STUDENT_DB.get(mssv)
+        ho_ten = db_student["student"]["ho_ten"] if db_student else "Tài khoản Sinh viên mới"
         accounts.append(
             {
                 "mssv": mssv,
-                "ho_ten": record["student"]["ho_ten"],
-                "password": ACCOUNT_METADATA[mssv]["password"],
-                "ngay_sinh": record["student"]["ngay_sinh"],
-                "sdt": record["student"]["sdt"],
+                "ho_ten": ho_ten,
+                "password": meta["password"],
+                "ngay_sinh": meta["ngay_sinh"],
+                "sdt": meta.get("sdt", ""),
             }
         )
     return accounts
+
+def validate_admin_login(username, password):
+    user = ADMIN_USERS.get(username)
+    if user and user["password"] == password:
+        return user
+    return None
+
+def get_all_students_for_admin():
+    get_student_records()
+    result = []
+    for mssv, meta in ACCOUNT_METADATA.items():
+        stu = STUDENT_DB.get(mssv)
+        name = stu["student"]["ho_ten"] if stu else "Tài khoản Sinh viên mới"
+        result.append({
+            "mssv": mssv,
+            "ho_ten": name,
+            "trang_thai": meta.get("trang_thai", "Đang học"),
+            "ngay_sinh": meta.get("ngay_sinh", "")
+        })
+    return result
+
+def add_new_student(mssv, password, ho_ten="Sinh viên mới", ngay_sinh="01/01/2000"):
+    if mssv in ACCOUNT_METADATA:
+        return False, "MSSV đã tồn tại"
+        
+    ACCOUNT_METADATA[mssv] = {
+        "password": password,
+        "ngay_sinh": ngay_sinh,
+        "gioi_tinh": "Nam",
+        "khoa_hoc": "2024-2028",
+        "trang_thai": "Đang học",
+        "sdt": "",
+        "dia_chi_thuong_tru": "",
+        "dia_chi_tam_tru": "",
+    }
+    
+    STUDENT_DB[mssv] = {
+        "student": {
+            "mssv": mssv,
+            "ho_ten": ho_ten,
+            "program_name": "Ngành mặc định",
+            "he_dao_tao": "Đại học chính quy",
+            "khoa_hoc": "2024",
+            "so_cmnd": "123456789",
+            "ngay_sinh": ngay_sinh,
+            "noi_sinh": "TP.HCM",
+            "gioi_tinh": "Nam",
+            "dan_toc": "Kinh",
+            "ton_giao": "Không",
+            "doan_vien": "Có",
+            "ngay_vao_doan": "26/03/2015",
+            "the_bhyt": "HD123456",
+            "han_bhyt": "31/12/2026",
+            "khu_vuc": "KV3",
+            "doi_tuong": "Không",
+        },
+        "grades": {},
+        "grades_summary": {
+            "gpa_tich_luy": 0.0,
+            "gpa_he_10": 0.0,
+            "tong_tin_chi": 0,
+            "tc_dat": 0,
+            "tc_tong": 140,
+            "tc_con_lai": 140,
+            "latest_completed_term": None,
+            "current_term": "HK1 (2024 - 2025)",
+            "previous_term_chart": None,
+            "semesters": [],
+            "gpa_history": [],
+        },
+        "curriculum": {"student": {"mssv": mssv, "ho_ten": ho_ten, "program_name": ""}, "semesters": [], "tong_tc": 0},
+    }
+    return True, "Tạo sinh viên thành công"
+
+def change_student_password(mssv, new_password):
+    if mssv not in ACCOUNT_METADATA:
+        return False, "Không tìm thấy sinh viên"
+    ACCOUNT_METADATA[mssv]["password"] = new_password
+    return True, "Đổi mật khẩu thành công"
 
 
 def get_student_record(mssv: str | None) -> dict:

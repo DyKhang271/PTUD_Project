@@ -5,6 +5,7 @@ from student_data_store import (
     get_available_accounts,
     validate_parent_login,
     validate_student_login,
+    validate_admin_login,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -20,6 +21,10 @@ class ParentLogin(BaseModel):
     mssv: str
     ngay_sinh: str
     sdt: str
+
+class AdminLogin(BaseModel):
+    username: str
+    password: str
 
 
 @router.post("/student-login")
@@ -59,3 +64,15 @@ def parent_login(data: ParentLogin):
 @router.get("/accounts")
 def get_accounts():
     return get_available_accounts()
+
+@router.post("/admin-login")
+def admin_login(data: AdminLogin):
+    user = validate_admin_login(data.username, data.password)
+    if user:
+        return {
+            "success": True,
+            "role": "admin",
+            "admin": user,
+            "token": f"admin-token-{data.username}",
+        }
+    return {"success": False, "message": "Tài khoản hoặc mật khẩu quản trị không đúng."}

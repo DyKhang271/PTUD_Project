@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getGrades, getGradesSummary, getStudent } from '../../services/api';
 import styles from './Grades.module.css';
@@ -11,6 +11,19 @@ export default function Grades() {
   const [selectedSemester, setSelectedSemester] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user?.mssv) return;
@@ -169,20 +182,43 @@ export default function Grades() {
 
       <div className={styles.semesterSelector}>
         <span className={styles.semesterLabel}>📅 Chọn học kỳ:</span>
-        <select
-          className={styles.semesterSelect}
-          value={selectedSemester}
-          onChange={(e) => setSelectedSemester(e.target.value)}
-        >
-          {(summary?.semesters || []).map((semester) => (
-            <option key={semester} value={semester}>
-              {semester}
-            </option>
-          ))}
-        </select>
+        <div className={styles.customSelectWrapper} ref={dropdownRef}>
+          <button 
+            className={styles.customSelectBtn} 
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+          >
+            <span>{selectedSemester === 'all' ? 'Tất cả kỳ học' : selectedSemester}</span>
+            <span className={`${styles.customSelectIcon} ${dropdownOpen ? styles.iconOpen : ''}`}>▼</span>
+          </button>
+          {dropdownOpen && (
+            <div className={styles.customDropdownMenu}>
+              <div
+                className={`${styles.customDropdownOption} ${selectedSemester === 'all' ? styles.customDropdownOptionActive : ''}`}
+                onClick={() => {
+                  setSelectedSemester('all');
+                  setDropdownOpen(false);
+                }}
+              >
+                Tất cả kỳ học
+              </div>
+              {(summary?.semesters || []).map((semester) => (
+                <div
+                  key={semester}
+                  className={`${styles.customDropdownOption} ${selectedSemester === semester ? styles.customDropdownOptionActive : ''}`}
+                  onClick={() => {
+                    setSelectedSemester(semester);
+                    setDropdownOpen(false);
+                  }}
+                >
+                  {semester}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         {semesterData && semesterData.gpa_hoc_ky > 0 && (
           <span className={styles.semesterGpa}>
-            GPA học kỳ:{' '}
+            {selectedSemester === 'all' ? 'GPA tích lũy: ' : 'GPA học kỳ: '}
             <span className={styles.semesterGpaValue}>
               {semesterData.gpa_hoc_ky?.toFixed(2)}
             </span>
@@ -209,25 +245,37 @@ export default function Grades() {
               </tr>
             </thead>
             <tbody>
-              {(semesterData?.mon_hoc || []).map((course) => (
-                <tr key={`${course.ma_mon}-${course.stt}`}>
-                  <td>{course.stt}</td>
-                  <td>{course.ma_mon}</td>
-                  <td>{course.ten_mon}</td>
-                  <td>{course.tc}</td>
-                  <td>{course.diem_qt ?? '-'}</td>
-                  <td>{course.diem_gk ?? '-'}</td>
-                  <td>{course.diem_ck ?? '-'}</td>
-                  <td>{course.diem_tk_10 ?? '-'}</td>
-                  <td>{course.diem_tk_4 ?? '-'}</td>
-                  <td className={getGradeClass(course.xep_loai)}>{course.xep_loai}</td>
-                  <td>
-                    <span className={`${styles.statusBadge} ${getStatusBadge(course.trang_thai)}`}>
-                      {course.trang_thai}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {(semesterData?.mon_hoc || []).map((course, index, arr) => {
+                const prev = arr[index - 1];
+                const showHeader = course.hoc_ky_goc && (!prev || prev.hoc_ky_goc !== course.hoc_ky_goc);
+
+                return (
+                  <React.Fragment key={`${course.ma_mon}-${course.stt}`}>
+                    {showHeader && (
+                      <tr className={styles.termGroupHeader}>
+                        <td colSpan="11">{course.hoc_ky_goc}</td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td>{course.stt}</td>
+                      <td>{course.ma_mon}</td>
+                      <td>{course.ten_mon}</td>
+                      <td>{course.tc}</td>
+                      <td>{course.diem_qt ?? '-'}</td>
+                      <td>{course.diem_gk ?? '-'}</td>
+                      <td>{course.diem_ck ?? '-'}</td>
+                      <td>{course.diem_tk_10 ?? '-'}</td>
+                      <td>{course.diem_tk_4 ?? '-'}</td>
+                      <td className={getGradeClass(course.xep_loai)}>{course.xep_loai}</td>
+                      <td>
+                        <span className={`${styles.statusBadge} ${getStatusBadge(course.trang_thai)}`}>
+                          {course.trang_thai}
+                        </span>
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

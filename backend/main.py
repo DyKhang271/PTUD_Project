@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import student, schedule, notifications, grades, curriculum, chatbot, auth
+from routers import student, schedule, notifications, grades, curriculum, chatbot, auth, admin
 
 app = FastAPI(title="Student Portal API", version="1.0.0")
 
@@ -22,6 +22,7 @@ app.include_router(grades.router)
 app.include_router(curriculum.router)
 app.include_router(chatbot.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

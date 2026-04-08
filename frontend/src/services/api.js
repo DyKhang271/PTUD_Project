@@ -39,6 +39,16 @@ export const studentLogin = (mssv, password) =>
 export const parentLogin = (ho_ten, mssv, ngay_sinh, sdt) =>
   api.post('/auth/parent-login', { ho_ten, mssv, ngay_sinh, sdt });
 
+export const adminLogin = (username, password) =>
+  api.post('/auth/admin-login', { username, password });
+
 export const getAvailableAccounts = () => api.get('/auth/accounts');
+
+export const getAdminStudents = () => api.get('/admin/students');
+
+export const createAdminStudent = (data) => api.post('/admin/students', data);
+
+export const updateAdminStudentPassword = (mssv, new_password) =>
+  api.put(`/admin/students/${mssv}/password`, { new_password });
 
 export default api;

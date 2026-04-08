@@ -5,6 +5,7 @@ import {
   getAvailableAccounts,
   parentLogin,
   studentLogin,
+  adminLogin,
 } from '../../services/api';
 import styles from './Login.module.css';
 
@@ -141,6 +142,26 @@ export default function Login() {
     }
 
     setLoading(true);
+
+    if (mssv.trim() === 'admin') {
+      try {
+        const res = await adminLogin('admin', password);
+        if (res.data.success) {
+          login(res.data.admin, 'admin');
+          navigate('/admin');
+        } else {
+          setError(res.data.message);
+          refreshCaptcha();
+        }
+      } catch {
+        setError('Lỗi kết nối server. Vui lòng thử lại.');
+        refreshCaptcha();
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       const res = await studentLogin(mssv.trim(), password);
       if (res.data.success) {
@@ -208,7 +229,7 @@ export default function Login() {
                 setError('');
               }}
             >
-              🎒 Sinh viên
+              🎒 Sinh viên / Quản trị
             </button>
             <button
               className={`${styles.tab} ${activeTab === 'parent' ? styles.tabActive : ''}`}
@@ -285,9 +306,9 @@ export default function Login() {
                 </button>
 
                 <div className={styles.loginHint}>
-                  <strong>2 tài khoản sinh viên hiện có</strong>
+                  <strong>Các tài khoản hiện có để thử nghiệm</strong>
                   <div className={styles.accountList}>
-                    {accounts.map((account) => (
+                    {[...accounts, { mssv: 'admin', password: 'admin', ho_ten: 'Tài khoản Quản trị viên' }].map((account) => (
                       <button
                         key={account.mssv}
                         type="button"
@@ -296,7 +317,7 @@ export default function Login() {
                       >
                         <span className={styles.accountName}>{account.ho_ten}</span>
                         <span className={styles.accountMeta}>
-                          {account.mssv} • mật khẩu: {account.password}
+                          {account.mssv === 'admin' ? 'Tài khoản: admin' : account.mssv} • mật khẩu: {account.password}
                         </span>
                       </button>
                     ))}

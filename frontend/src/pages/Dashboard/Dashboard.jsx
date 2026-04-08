@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getGradesSummary, getNotifications, getStudent } from '../../services/api';
+import { getStudent, getGradesSummary, getGrades } from '../../services/api';
 import styles from './Dashboard.module.css';
 
 function formatRelativeTime(timeStr) {
@@ -28,10 +28,10 @@ function splitTermLabel(termLabel) {
   };
 }
 
-function getBarColor(gpa4) {
-  if (gpa4 >= 3.6) return '#16a34a';
-  if (gpa4 >= 3.0) return '#2563eb';
-  if (gpa4 >= 2.0) return '#f59e0b';
+function getGradeColor(letter) {
+  if (['A', 'A+'].includes(letter)) return '#16a34a';
+  if (['B+', 'B'].includes(letter)) return '#2563eb';
+  if (['C+', 'C'].includes(letter)) return '#f59e0b';
   return '#ef4444';
 }
 
@@ -39,11 +39,24 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user, isParent } = useAuth();
   const [student, setStudent] = useState(null);
-  const [notifications, setNotifications] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showAllNotifs, setShowAllNotifs] = useState(false);
+  
+  const [selectedChartTerm, setSelectedChartTerm] = useState('');
+  const [chartTermData, setChartTermData] = useState(null);
+  const [chartTermDropdownOpen, setChartTermDropdownOpen] = useState(false);
+  const chartTermDropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (chartTermDropdownRef.current && !chartTermDropdownRef.current.contains(event.target)) {
+        setChartTermDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (!user?.mssv) return;
@@ -51,13 +64,16 @@ export default function Dashboard() {
     setLoading(true);
     Promise.all([
       getStudent(user.mssv),
-      getNotifications(),
       getGradesSummary(user.mssv),
     ])
-      .then(([studentRes, notificationRes, summaryRes]) => {
+      .then(([studentRes, summaryRes]) => {
         setStudent(studentRes.data);
-        setNotifications(notificationRes.data);
         setSummary(summaryRes.data);
+        if (summaryRes.data.previous_term_chart?.term) {
+          setSelectedChartTerm(summaryRes.data.previous_term_chart.term);
+        } else if (summaryRes.data.semesters?.length > 0) {
+          setSelectedChartTerm(summaryRes.data.semesters[summaryRes.data.semesters.length - 1]);
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -66,15 +82,104 @@ export default function Dashboard() {
       });
   }, [user?.mssv]);
 
-  const displayedNotifs = showAllNotifs ? notifications : notifications.slice(0, 5);
+  useEffect(() => {
+    if (!selectedChartTerm || !user?.mssv) return;
+
+    // Use initial summary data to save a request for the default term
+    if (summary && summary.previous_term_chart?.term === selectedChartTerm && !chartTermData) {
+      setChartTermData({
+        gpa_hoc_ky: summary.previous_term_chart.gpa_hoc_ky,
+        mon_hoc: summary.previous_term_chart.courses.map(c => ({
+          ten_mon: c.course_name,
+          ma_mon: c.course_code,
+          tc: c.credits,
+          diem_tk_4: c.gpa4,
+          xep_loai: c.letter
+        }))
+      });
+      return;
+    }
+
+    getGrades(selectedChartTerm, user.mssv)
+      .then(res => setChartTermData(res.data))
+      .catch(() => {});
+  }, [selectedChartTerm, user?.mssv]);
+
   const remainingCredits = summary?.tc_con_lai ?? 0;
   const currentTerm = splitTermLabel(summary?.current_term);
 
-  const previousTermChart = summary?.previous_term_chart;
   const chartCourses = useMemo(
-    () => previousTermChart?.courses || [],
-    [previousTermChart],
+    () => (chartTermData?.mon_hoc || []).filter(c => c.diem_tk_4 !== undefined && c.diem_tk_4 !== null && c.diem_tk_4 !== '-'),
+    [chartTermData],
   );
+
+  const gpaHistory = useMemo(() => summary?.gpa_history || [], [summary]);
+
+  const renderGpaChart = () => {
+    if (gpaHistory.length === 0) {
+      return <div className={styles.emptyState}>Chưa có đủ dữ liệu GPA để hiển thị biểu đồ.</div>;
+    }
+
+    const svgWidth = 550;
+    const svgHeight = 320;
+    const paddingX = 40;
+    const paddingY = 25;
+    const chartW = svgWidth - paddingX * 2;
+    const chartH = svgHeight - paddingY * 2 - 20; // Extra room at bottom for labels
+
+    const points = gpaHistory.map((item, i) => {
+      const shortTerm = item.term.split(' (')[0]; // Extends "HK1 (2023 - 2024)" into "HK1"
+      const x = paddingX + (i / Math.max(1, gpaHistory.length - 1)) * chartW;
+      const y = paddingY + chartH - (item.gpa4_term / 4.0) * chartH;
+      return { x, y, term: shortTerm, gpa: item.gpa4_term, gpaCum: item.gpa4_cumulative };
+    });
+
+    const pathData = "M " + points.map(p => `${p.x},${p.y}`).join(" L ");
+    const cumPathData = "M " + points.map((p) => {
+      const y = paddingY + chartH - (p.gpaCum / 4.0) * chartH;
+      return `${p.x},${y}`;
+    }).join(" L ");
+
+    return (
+      <div className={styles.svgChartContainer}>
+        <div className={styles.chartLegend}>
+          <div className={styles.legendItem}><span className={styles.legendColor} style={{background: 'var(--primary)'}}></span> GPA Từng kỳ</div>
+          <div className={styles.legendItem}><span className={styles.legendColor} style={{background: '#f59e0b'}}></span> GPA Tích lũy</div>
+        </div>
+        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className={styles.svgLineChart}>
+          {/* Y Axis Grid */}
+          {[1, 2, 3, 4].map(val => {
+            const y = paddingY + chartH - (val / 4.0) * chartH;
+            return (
+              <g key={`grid-y-${val}`}>
+                <line x1={paddingX} y1={y} x2={svgWidth - paddingX} y2={y} stroke="var(--border-light)" strokeWidth="1" />
+                <text x={paddingX - 10} y={y + 4} fontSize="11" fill="var(--text-light)" textAnchor="end">{val.toFixed(1)}</text>
+              </g>
+            );
+          })}
+          <text x={paddingX - 10} y={paddingY + chartH + 4} fontSize="11" fill="var(--text-light)" textAnchor="end">0.0</text>
+
+          {/* Cumulative GPA Path */}
+          <path d={cumPathData} fill="none" stroke="#f59e0b" strokeWidth="2" strokeDasharray="5,5" />
+          
+          {/* Term GPA Path */}
+          <path d={pathData} fill="none" stroke="var(--primary)" strokeWidth="3" />
+          
+          {/* Data Points */}
+          {points.map((p, i) => (
+            <g key={`point-${i}`} className={styles.svgPointGroup}>
+              {/* Vertical guideline */}
+              <line className={styles.svgGuideLine} x1={p.x} y1={paddingY} x2={p.x} y2={paddingY + chartH} stroke="var(--border)" strokeWidth="1" strokeDasharray="4,4" opacity="0" />
+              <circle cx={p.x} cy={p.y} r="5" fill="#fff" stroke="var(--primary)" strokeWidth="2.5" />
+              <text x={p.x} y={p.y - 14} fontSize="11" fontWeight="bold" fill="var(--primary)" textAnchor="middle">{p.gpa.toFixed(2)}</text>
+              {/* X Axis Label */}
+              <text x={p.x} y={svgHeight - 12} fontSize="11" fontWeight="600" fill="var(--text-secondary)" textAnchor="middle">{p.term}</text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -164,9 +269,42 @@ export default function Dashboard() {
       <div className={styles.contentRow}>
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <h2 className={styles.cardTitle}>📊 GPA các môn ở kỳ trước</h2>
-            {previousTermChart?.term && (
-              <span className={styles.chartMeta}>{previousTermChart.term}</span>
+            <h2 className={styles.cardTitle}>📊 GPA các môn theo kỳ</h2>
+            {summary?.semesters?.length > 0 && (
+              <div className={styles.customSelectWrapper} ref={chartTermDropdownRef}>
+                <button 
+                  className={styles.customSelectBtn} 
+                  onClick={() => setChartTermDropdownOpen(!chartTermDropdownOpen)}
+                >
+                  <span>{selectedChartTerm === 'all' ? 'Tất cả các kỳ' : selectedChartTerm}</span>
+                  <span className={`${styles.customSelectIcon} ${chartTermDropdownOpen ? styles.iconOpen : ''}`}>▼</span>
+                </button>
+                {chartTermDropdownOpen && (
+                  <div className={styles.customDropdownMenu}>
+                    <div
+                      className={`${styles.customDropdownOption} ${selectedChartTerm === 'all' ? styles.customDropdownOptionActive : ''}`}
+                      onClick={() => {
+                        setSelectedChartTerm('all');
+                        setChartTermDropdownOpen(false);
+                      }}
+                    >
+                      Tất cả các kỳ
+                    </div>
+                    {summary.semesters.map((term) => (
+                      <div
+                        key={term}
+                        className={`${styles.customDropdownOption} ${selectedChartTerm === term ? styles.customDropdownOptionActive : ''}`}
+                        onClick={() => {
+                          setSelectedChartTerm(term);
+                          setChartTermDropdownOpen(false);
+                        }}
+                      >
+                        {term}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <div className={styles.cardBody}>
@@ -175,9 +313,9 @@ export default function Dashboard() {
                 <div className={styles.chartSummaryRow}>
                   <div>
                     <div className={styles.chartSummaryValue}>
-                      {previousTermChart?.gpa_hoc_ky?.toFixed(2)}
+                      {chartTermData?.gpa_hoc_ky?.toFixed(2) || '0.00'}
                     </div>
-                    <div className={styles.chartSummaryLabel}>GPA học kỳ trước</div>
+                    <div className={styles.chartSummaryLabel}>GPA học kỳ</div>
                   </div>
                   <div className={styles.chartSummaryNote}>
                     Biểu đồ dùng thang điểm 4.0 cho các môn đã có kết quả.
@@ -191,26 +329,27 @@ export default function Dashboard() {
                     ))}
                   </div>
                   <div className={styles.chartBars}>
-                    {chartCourses.map((course) => (
-                      <div className={styles.chartBarItem} key={`${course.course_code}-${course.course_name}`}>
-                        <div className={styles.chartBarValue}>{course.gpa4.toFixed(1)}</div>
-                        <div className={styles.chartBarTrack}>
-                          <div
-                            className={styles.chartBarFill}
-                            style={{
-                              height: `${(course.gpa4 / 4) * 100}%`,
-                              background: `linear-gradient(180deg, ${getBarColor(course.gpa4)} 0%, rgba(255,255,255,0.2) 140%)`,
-                            }}
-                          />
+                    {chartCourses.map((course, index) => {
+                      const fillPercent = (course.diem_tk_4 / 4.0) * 100;
+                      return (
+                        <div key={index} className={styles.chartBarItem}>
+                          <div className={styles.chartBarValue}>{course.diem_tk_4}</div>
+                          <div className={styles.chartBarTrack}>
+                            <div
+                              className={styles.chartBarFill}
+                              style={{
+                                height: `${fillPercent}%`,
+                                background: getGradeColor(course.xep_loai),
+                              }}
+                            />
+                          </div>
+                          <div className={styles.chartBarLabel} title={course.ten_mon}>
+                            {course.ten_mon}
+                          </div>
+                          <div className={styles.chartBarMeta}>{course.tc} TC</div>
                         </div>
-                        <div className={styles.chartBarLabel} title={course.course_name}>
-                          {course.course_name}
-                        </div>
-                        <div className={styles.chartBarMeta}>
-                          {course.course_code} • {course.letter || '-'}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </>
@@ -224,40 +363,11 @@ export default function Dashboard() {
 
         <div className={styles.card}>
           <div className={styles.cardHeader}>
-            <h2 className={styles.cardTitle}>🔔 Thông báo mới</h2>
-            <span className={styles.notifCount}>
-              {notifications.filter((notification) => !notification.da_doc).length} chưa đọc
-            </span>
+            <h2 className={styles.cardTitle}>📈 Biểu đồ biến thiên GPA</h2>
           </div>
           <div className={styles.cardBody}>
-            <div className={styles.notifList}>
-              {displayedNotifs.map((notification) => (
-                <div className={styles.notifItem} key={notification.id}>
-                  <div className={styles.notifIcon}>{notification.loai}</div>
-                  <div className={styles.notifContent}>
-                    <div className={styles.notifTitle}>
-                      {notification.tieu_de}
-                      {!notification.da_doc && (
-                        <span className={styles.notifBadge}>Mới</span>
-                      )}
-                    </div>
-                    {showAllNotifs && (
-                      <div className={styles.notifBody}>{notification.noi_dung}</div>
-                    )}
-                    <div className={styles.notifTime}>
-                      {formatRelativeTime(notification.thoi_gian)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {renderGpaChart()}
           </div>
-          <button
-            className={styles.viewAllBtn}
-            onClick={() => setShowAllNotifs(!showAllNotifs)}
-          >
-            {showAllNotifs ? '← Thu gọn' : `Xem tất cả (${notifications.length}) →`}
-          </button>
         </div>
       </div>
     </div>

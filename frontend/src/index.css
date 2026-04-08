@@ -163,3 +163,31 @@ img {
   font-size: 0.95rem;
   font-weight: 500;
 }
+
+/* Layout Classes */
+.layout-wrapper {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  transition: margin-left var(--transition-normal);
+  margin-left: var(--sidebar-width);
+}
+
+.main-content.collapsed {
+  margin-left: 0;
+}
+
+.main-content-inner {
+  margin-top: var(--topbar-height);
+  padding: 24px 28px;
+  min-height: calc(100vh - var(--topbar-height));
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+}

@@ -186,6 +186,76 @@
   color: var(--primary);
 }
 
+.customSelectWrapper {
+  position: relative;
+}
+
+.customSelectBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.customSelectBtn:hover {
+  border-color: var(--primary);
+  background: rgb(249, 250, 251);
+}
+
+.customSelectIcon {
+  font-size: 0.6rem;
+  color: var(--text-light);
+  transition: transform 0.2s ease;
+}
+
+.iconOpen {
+  transform: rotate(180deg);
+}
+
+.customDropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-light);
+  min-width: 100%;
+  white-space: nowrap;
+  z-index: 50;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.customDropdownOption {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--transition-fast);
+}
+
+.customDropdownOption:hover {
+  background: rgb(243, 244, 246);
+}
+
+.customDropdownOptionActive {
+  background: rgb(239, 246, 255);
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .chartSummaryRow {
   display: flex;
   align-items: flex-end;
@@ -208,11 +278,11 @@
 }
 
 .chartSummaryNote {
-  max-width: 280px;
   font-size: 0.78rem;
   line-height: 1.6;
   color: var(--text-secondary);
   text-align: right;
+  white-space: nowrap;
 }
 
 .chartArea {
@@ -286,6 +356,7 @@
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -307,95 +378,55 @@
   color: var(--text-secondary);
 }
 
-.notifCount {
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  background: var(--danger-bg);
-  color: var(--danger);
-  border-radius: 12px;
-  font-weight: 600;
-}
-
-.notifList {
-  display: flex;
-  flex-direction: column;
-}
-
-.notifItem {
-  display: flex;
-  gap: 12px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.notifItem:last-child {
-  border-bottom: none;
-}
-
-.notifIcon {
-  font-size: 1.3rem;
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.notifContent {
-  flex: 1;
-  min-width: 0;
-}
-
-.notifTitle {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 2px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.notifBadge {
-  font-size: 0.6rem;
-  padding: 2px 6px;
-  background: var(--danger);
-  color: #fff;
-  border-radius: 10px;
-  font-weight: 700;
-}
-
-.notifBody {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin: 4px 0;
-}
-
-.notifTime {
-  font-size: 0.72rem;
-  color: var(--text-light);
-}
-
-.viewAllBtn {
-  display: block;
+.svgChartContainer {
+  position: relative;
   width: 100%;
-  padding: 14px;
-  text-align: center;
-  color: var(--primary-light);
-  font-weight: 600;
-  font-size: 0.85rem;
-  background: none;
-  border-top: 1px solid var(--border-light);
-  transition: background var(--transition-fast);
+  padding-top: 10px;
 }
 
-.viewAllBtn:hover {
-  background: var(--accent);
+.chartLegend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.legendColor {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.svgLineChart {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.svgPointGroup {
+  transition: opacity var(--transition-fast);
+}
+
+.svgPointGroup:hover .svgGuideLine {
+  opacity: 1;
+}
+
+.svgPointGroup circle {
+  transition: r var(--transition-fast);
+}
+
+.svgPointGroup:hover circle {
+  r: 6;
 }
 
 .loadingCenter {

@@ -32,11 +32,17 @@
   flex-shrink: 0;
 }
 
-.sumIconGpa { background: #e8f0fe; }
-.sumIconPass { background: #e6f9ed; }
-.sumIconFail { background: #fde8ea; }
+.sumIconGpa {
+  background: #e8f0fe;
+}
 
-.sumInfo {}
+.sumIconPass {
+  background: #e6f9ed;
+}
+
+.sumIconFail {
+  background: #fde8ea;
+}
 
 .sumValue {
   font-size: 1.5rem;
@@ -114,19 +120,74 @@
   color: var(--text);
 }
 
-.semesterSelect {
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  color: var(--text);
-  background: #fff;
-  cursor: pointer;
-  transition: border-color var(--transition-fast);
+.customSelectWrapper {
+  position: relative;
 }
 
-.semesterSelect:focus {
-  border-color: var(--primary-light);
+.customSelectBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.customSelectBtn:hover {
+  border-color: var(--primary);
+  background: rgb(249, 250, 251);
+}
+
+.customSelectIcon {
+  font-size: 0.6rem;
+  color: var(--text-light);
+  transition: transform 0.2s ease;
+}
+
+.iconOpen {
+  transform: rotate(180deg);
+}
+
+.customDropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-light);
+  min-width: 100%;
+  white-space: nowrap;
+  z-index: 50;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.customDropdownOption {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--transition-fast);
+}
+
+.customDropdownOption:hover {
+  background: rgb(243, 244, 246);
+}
+
+.customDropdownOptionActive {
+  background: rgb(239, 246, 255);
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .semesterGpa {
@@ -186,6 +247,17 @@
   border-bottom: 1px solid var(--border-light);
   color: var(--text);
   font-weight: 500;
+}
+
+.termGroupHeader td {
+  background: rgba(74, 144, 217, 0.05); /* very light primary */
+  color: var(--primary);
+  font-weight: 700;
+  text-align: left !important;
+  font-size: 0.85rem;
+  padding: 14px 20px !important;
+  border-top: 1px solid var(--border) !important;
+  border-bottom: 1px solid var(--border) !important;
 }
 
 .table td:first-child {
