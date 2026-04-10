@@ -2,10 +2,12 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
+  adminLogin,
   getAvailableAccounts,
+  getAvailableTeachers,
   parentLogin,
   studentLogin,
-  adminLogin,
+  teacherLogin,
 } from '../../services/api';
 import styles from './Login.module.css';
 
@@ -72,11 +74,15 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [accounts, setAccounts] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const [mssv, setMssv] = useState('');
   const [password, setPassword] = useState('');
+
+  const [teacherUsername, setTeacherUsername] = useState('');
+  const [teacherPassword, setTeacherPassword] = useState('');
 
   const [pHoTen, setPHoTen] = useState('');
   const [pMssv, setPMssv] = useState('');
@@ -101,6 +107,9 @@ export default function Login() {
     getAvailableAccounts()
       .then((res) => setAccounts(res.data))
       .catch(() => setAccounts([]));
+    getAvailableTeachers()
+      .then((res) => setTeachers(res.data))
+      .catch(() => setTeachers([]));
   }, [refreshCaptcha]);
 
   useEffect(() => {
@@ -113,9 +122,24 @@ export default function Login() {
     return () => clearTimeout(timer);
   }, [activeTab, captchaText]);
 
+  const verifyCaptcha = () => {
+    if (captchaInput.toUpperCase() !== captchaText) {
+      setError('Mã CAPTCHA không chính xác.');
+      refreshCaptcha();
+      return false;
+    }
+    return true;
+  };
+
   const fillStudentAccount = (account) => {
     setMssv(account.mssv);
     setPassword(account.password);
+    setError('');
+  };
+
+  const fillTeacherAccount = (teacher) => {
+    setTeacherUsername(teacher.username);
+    setTeacherPassword(teacher.password);
     setError('');
   };
 
@@ -135,38 +159,59 @@ export default function Login() {
       setError('Vui lòng nhập đầy đủ thông tin.');
       return;
     }
-    if (captchaInput.toUpperCase() !== captchaText) {
-      setError('Mã CAPTCHA không chính xác.');
-      refreshCaptcha();
+    if (!verifyCaptcha()) {
       return;
     }
 
     setLoading(true);
 
-    if (mssv.trim() === 'admin') {
-      try {
+    try {
+      if (mssv.trim() === 'admin') {
         const res = await adminLogin('admin', password);
         if (res.data.success) {
           login(res.data.admin, 'admin');
           navigate('/admin');
-        } else {
-          setError(res.data.message);
-          refreshCaptcha();
+          return;
         }
-      } catch {
-        setError('Lỗi kết nối server. Vui lòng thử lại.');
+        setError(res.data.message);
         refreshCaptcha();
-      } finally {
-        setLoading(false);
+        return;
       }
-      return;
-    }
 
-    try {
       const res = await studentLogin(mssv.trim(), password);
       if (res.data.success) {
         login(res.data.student, 'student');
         navigate('/dashboard');
+      } else {
+        setError(res.data.message);
+        refreshCaptcha();
+      }
+    } catch {
+      setError('Lỗi kết nối server. Vui lòng thử lại.');
+      refreshCaptcha();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTeacherLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!teacherUsername.trim() || !teacherPassword.trim()) {
+      setError('Vui lòng nhập đầy đủ thông tin giảng viên.');
+      return;
+    }
+    if (!verifyCaptcha()) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await teacherLogin(teacherUsername.trim(), teacherPassword);
+      if (res.data.success) {
+        login(res.data.teacher, 'teacher');
+        navigate('/teacher');
       } else {
         setError(res.data.message);
         refreshCaptcha();
@@ -187,9 +232,7 @@ export default function Login() {
       setError('Vui lòng nhập đầy đủ thông tin.');
       return;
     }
-    if (captchaInput.toUpperCase() !== captchaText) {
-      setError('Mã CAPTCHA không chính xác.');
-      refreshCaptcha();
+    if (!verifyCaptcha()) {
       return;
     }
 
@@ -218,7 +261,7 @@ export default function Login() {
           <div className={styles.loginHeader}>
             <div className={styles.loginLogo}>🎓</div>
             <div className={styles.loginTitle}>IUH Portal</div>
-            <div className={styles.loginSubtitle}>Cổng thông tin sinh viên</div>
+            <div className={styles.loginSubtitle}>Cổng thông tin sinh viên và giảng viên</div>
           </div>
 
           <div className={styles.tabs}>
@@ -229,7 +272,16 @@ export default function Login() {
                 setError('');
               }}
             >
-              🎒 Sinh viên / Quản trị
+              Sinh viên / Quản trị
+            </button>
+            <button
+              className={`${styles.tab} ${activeTab === 'teacher' ? styles.tabActive : ''}`}
+              onClick={() => {
+                setActiveTab('teacher');
+                setError('');
+              }}
+            >
+              Giảng viên
             </button>
             <button
               className={`${styles.tab} ${activeTab === 'parent' ? styles.tabActive : ''}`}
@@ -238,21 +290,21 @@ export default function Login() {
                 setError('');
               }}
             >
-              👨‍👩‍👧 Phụ huynh
+              Phụ huynh
             </button>
           </div>
 
           <div className={styles.formBody}>
             {error && <div className={styles.formError}>⚠️ {error}</div>}
 
-            {activeTab === 'student' ? (
+            {activeTab === 'student' && (
               <form onSubmit={handleStudentLogin}>
                 <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Mã số sinh viên</label>
+                  <label className={styles.formLabel}>Mã đăng nhập</label>
                   <input
                     className={styles.formInput}
                     type="text"
-                    placeholder="Nhập MSSV"
+                    placeholder="Nhập MSSV hoặc admin"
                     value={mssv}
                     onChange={(e) => setMssv(e.target.value)}
                     autoFocus
@@ -293,22 +345,18 @@ export default function Login() {
                     onClick={refreshCaptcha}
                     title="Tạo mã mới"
                   >
-                    🔄
+                    ↻
                   </button>
                 </div>
 
-                <button
-                  type="submit"
-                  className={styles.submitBtn}
-                  disabled={loading}
-                >
+                <button type="submit" className={styles.submitBtn} disabled={loading}>
                   {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
                 </button>
 
                 <div className={styles.loginHint}>
-                  <strong>Các tài khoản hiện có để thử nghiệm</strong>
+                  <strong>Tài khoản demo</strong>
                   <div className={styles.accountList}>
-                    {[...accounts, { mssv: 'admin', password: 'admin', ho_ten: 'Tài khoản Quản trị viên' }].map((account) => (
+                    {[...accounts, { mssv: 'admin', password: 'admin', ho_ten: 'Quản trị viên hệ thống' }].map((account) => (
                       <button
                         key={account.mssv}
                         type="button"
@@ -324,7 +372,89 @@ export default function Login() {
                   </div>
                 </div>
               </form>
-            ) : (
+            )}
+
+            {activeTab === 'teacher' && (
+              <form onSubmit={handleTeacherLogin}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Tài khoản giảng viên</label>
+                  <input
+                    className={styles.formInput}
+                    type="text"
+                    placeholder="Ví dụ: gvungdung"
+                    value={teacherUsername}
+                    onChange={(e) => setTeacherUsername(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Mật khẩu</label>
+                  <input
+                    className={styles.formInput}
+                    type="password"
+                    placeholder="Nhập mật khẩu"
+                    value={teacherPassword}
+                    onChange={(e) => setTeacherPassword(e.target.value)}
+                  />
+                </div>
+
+                <label className={styles.formLabel}>Mã xác thực</label>
+                <div className={styles.captchaRow}>
+                  <canvas
+                    ref={captchaRef}
+                    width={150}
+                    height={50}
+                    className={styles.captchaCanvas}
+                    title="Click để tạo mã mới"
+                    onClick={refreshCaptcha}
+                  />
+                  <input
+                    className={styles.captchaInput}
+                    type="text"
+                    placeholder="Nhập mã"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    maxLength={5}
+                  />
+                  <button
+                    type="button"
+                    className={styles.captchaRefresh}
+                    onClick={refreshCaptcha}
+                    title="Tạo mã mới"
+                  >
+                    ↻
+                  </button>
+                </div>
+
+                <button type="submit" className={styles.submitBtn} disabled={loading}>
+                  {loading ? 'Đang xác thực...' : 'Vào không gian giảng viên'}
+                </button>
+
+                <div className={`${styles.loginHint} ${styles.teacherHint}`}>
+                  <strong>Tài khoản giảng viên đang được cấu hình</strong>
+                  <div className={styles.accountList}>
+                    {teachers.map((teacher) => (
+                      <button
+                        key={teacher.username}
+                        type="button"
+                        className={styles.accountItem}
+                        onClick={() => fillTeacherAccount(teacher)}
+                      >
+                        <span className={styles.accountName}>{teacher.name}</span>
+                        <span className={styles.accountMeta}>
+                          {teacher.username} • {teacher.department}
+                        </span>
+                        <span className={styles.accountCourses}>
+                          {teacher.courses.join(' • ')}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {activeTab === 'parent' && (
               <form onSubmit={handleParentLogin}>
                 <div className={styles.formGroup}>
                   <label className={styles.formLabel}>Họ và tên sinh viên</label>
@@ -392,15 +522,11 @@ export default function Login() {
                     onClick={refreshCaptcha}
                     title="Tạo mã mới"
                   >
-                    🔄
+                    ↻
                   </button>
                 </div>
 
-                <button
-                  type="submit"
-                  className={styles.submitBtn}
-                  disabled={loading}
-                >
+                <button type="submit" className={styles.submitBtn} disabled={loading}>
                   {loading ? 'Đang xác thực...' : 'Đăng nhập phụ huynh'}
                 </button>
 
@@ -426,7 +552,7 @@ export default function Login() {
             )}
           </div>
 
-          {activeTab === 'student' && (
+          {activeTab !== 'parent' && (
             <div className={styles.parentNote}>
               Phụ huynh muốn theo dõi kết quả học tập?
               {' '}

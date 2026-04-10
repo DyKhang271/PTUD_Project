@@ -3,9 +3,11 @@ from pydantic import BaseModel
 
 from student_data_store import (
     get_available_accounts,
+    get_available_teacher_accounts,
+    validate_admin_login,
     validate_parent_login,
     validate_student_login,
-    validate_admin_login,
+    validate_teacher_login,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -22,7 +24,13 @@ class ParentLogin(BaseModel):
     ngay_sinh: str
     sdt: str
 
+
 class AdminLogin(BaseModel):
+    username: str
+    password: str
+
+
+class TeacherLogin(BaseModel):
     username: str
     password: str
 
@@ -61,10 +69,6 @@ def parent_login(data: ParentLogin):
     }
 
 
-@router.get("/accounts")
-def get_accounts():
-    return get_available_accounts()
-
 @router.post("/admin-login")
 def admin_login(data: AdminLogin):
     user = validate_admin_login(data.username, data.password)
@@ -75,4 +79,33 @@ def admin_login(data: AdminLogin):
             "admin": user,
             "token": f"admin-token-{data.username}",
         }
-    return {"success": False, "message": "Tài khoản hoặc mật khẩu quản trị không đúng."}
+    return {
+        "success": False,
+        "message": "Tài khoản hoặc mật khẩu quản trị không đúng.",
+    }
+
+
+@router.post("/teacher-login")
+def teacher_login(data: TeacherLogin):
+    teacher = validate_teacher_login(data.username, data.password)
+    if teacher:
+        return {
+            "success": True,
+            "role": "teacher",
+            "teacher": teacher,
+            "token": f"teacher-token-{data.username}",
+        }
+    return {
+        "success": False,
+        "message": "Tài khoản hoặc mật khẩu giảng viên không đúng.",
+    }
+
+
+@router.get("/accounts")
+def get_accounts():
+    return get_available_accounts()
+
+
+@router.get("/teachers")
+def get_teacher_accounts():
+    return get_available_teacher_accounts()

@@ -2,7 +2,18 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from copy import deepcopy
 from pathlib import Path
+
+from grade_logic import (
+    build_course_grade,
+    classify_academic_standing,
+    extract_component_scores,
+    get_term_sort_key,
+    serialize_component_scores,
+    weighted_average,
+)
+from json_store import load_runtime_state, save_runtime_state
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -11,8 +22,72 @@ DATA_DIR = BASE_DIR / "data_json"
 ADMIN_USERS = {
     "admin": {
         "password": "admin",
-        "name": "Quản trị viên"
+        "name": "Quản trị viên",
     }
+}
+
+TEACHER_USERS = {
+    "gvungdung": {
+        "password": "gvungdung",
+        "name": "ThS. Nguyễn Hoàng Anh",
+        "department": "Bộ môn Phát triển ứng dụng",
+        "title": "Giảng viên chuyên ngành",
+        "assignments": [
+            {
+                "course_code": "4203003443",
+                "course_name": "Khai thác dữ liệu và ứng dụng",
+                "term": "HK2 (2025 - 2026)",
+            },
+            {
+                "course_code": "4203003501",
+                "course_name": "Phát triển ứng dụng",
+                "term": "HK2 (2025 - 2026)",
+            },
+        ],
+    },
+    "gvaiml": {
+        "password": "gvaiml",
+        "name": "TS. Trần Minh Quân",
+        "department": "Bộ môn Trí tuệ nhân tạo",
+        "title": "Giảng viên phụ trách AI/ML",
+        "assignments": [
+            {
+                "course_code": "4203001545",
+                "course_name": "Nhận dạng mẫu",
+                "term": "HK2 (2025 - 2026)",
+            },
+            {
+                "course_code": "4203003711",
+                "course_name": "Máy học",
+                "term": "HK2 (2025 - 2026)",
+            },
+            {
+                "course_code": "4203004116",
+                "course_name": "Học sâu",
+                "term": "HK2 (2025 - 2026)",
+            },
+            {
+                "course_code": "4203014115",
+                "course_name": "Khai phá đồ thị",
+                "term": "HK2 (2025 - 2026)",
+            },
+            {
+                "course_code": "4203001146",
+                "course_name": "Hệ cơ sở dữ liệu",
+                "term": "HK2 (2025 - 2026)",
+            },
+            {
+                "course_code": "4203002070",
+                "course_name": "Lập trình hướng sự kiện với công nghệ Java",
+                "term": "HK2 (2025 - 2026)",
+            },
+            {
+                "course_code": "4203002117",
+                "course_name": "Những vấn đề xã hội và nghề nghiệp",
+                "term": "HK2 (2025 - 2026)",
+            },
+        ],
+    },
 }
 
 ACCOUNT_METADATA = {
@@ -48,9 +123,26 @@ COURSE_TYPE_LABELS = {
     "elective": "Tự chọn",
 }
 
+DEFAULT_CURRICULUM_SUMMARY = {
+    "total_required_credits": 140,
+    "mandatory_credits": 110,
+    "elective_credits": 30,
+    "note": "Dữ liệu sinh viên mới được khởi tạo trong hệ thống quản trị.",
+}
+
+RAW_STUDENT_DB: dict[str, dict] = {}
+STUDENT_DB: dict[str, dict] = {}
+
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _persist_runtime_state() -> None:
+    save_runtime_state(
+        account_metadata=ACCOUNT_METADATA,
+        raw_student_db=RAW_STUDENT_DB,
+    )
 
 
 def _normalize_course_status(raw_status: str | None, final_score: float | None) -> str:
@@ -79,11 +171,27 @@ def _get_latest_completed_term(transcript_terms: list[dict]) -> dict | None:
     return transcript_terms[-1] if transcript_terms else None
 
 
+def _get_metadata(mssv: str) -> dict:
+    return ACCOUNT_METADATA.setdefault(
+        mssv,
+        {
+            "password": mssv,
+            "ngay_sinh": "01/01/2000",
+            "gioi_tinh": "Nam",
+            "khoa_hoc": "2024-2028",
+            "trang_thai": "Đang học",
+            "sdt": "",
+            "dia_chi_thuong_tru": "",
+            "dia_chi_tam_tru": "",
+        },
+    )
+
+
 def _build_student_payload(record: dict) -> dict:
     student = record["student"]
     transcript_terms = record["transcript_terms"]
     latest_completed = _get_latest_completed_term(transcript_terms) or {}
-    metadata = ACCOUNT_METADATA[student["student_id"]]
+    metadata = _get_metadata(student["student_id"])
 
     return {
         "mssv": student["student_id"],
@@ -128,14 +236,14 @@ def _build_grades_by_term(record: dict) -> dict[str, dict]:
                 {
                     "stt": index,
                     "ma_mon": course["class_section_code"][:10],
+                    "class_section_code": course["class_section_code"],
                     "ten_mon": course["course_name"],
                     "tc": course["credits"],
-                    "diem_qt": None,
-                    "diem_gk": None,
-                    "diem_ck": None,
+                    **extract_component_scores(course.get("midterm_scores")),
                     "diem_tk_10": course.get("final_score"),
                     "diem_tk_4": course.get("gpa4"),
                     "xep_loai": course.get("letter") or "-",
+                    "xep_loai_chi_tiet": course.get("classification"),
                     "trang_thai": _normalize_course_status(
                         course.get("status"),
                         course.get("final_score"),
@@ -266,37 +374,169 @@ def _build_curriculum_payload(record: dict, student_payload: dict) -> dict:
     }
 
 
-STUDENT_DB = {}
+def _build_public_record(raw_record: dict) -> dict:
+    student_payload = _build_student_payload(raw_record)
+    return {
+        "student": student_payload,
+        "grades": _build_grades_by_term(raw_record),
+        "grades_summary": _build_grades_summary(raw_record),
+        "curriculum": _build_curriculum_payload(raw_record, student_payload),
+    }
 
-def get_student_records() -> dict[str, dict]:
-    global STUDENT_DB
-    if STUDENT_DB:
-        return STUDENT_DB
 
+def _load_initial_raw_records() -> dict[str, dict]:
     records: dict[str, dict] = {}
-
     for data_file in DATA_FILES:
         raw = _load_json(data_file)
-        student_payload = _build_student_payload(raw)
-        mssv = student_payload["mssv"]
+        records[raw["student"]["student_id"]] = raw
+    return records
 
-        records[mssv] = {
-            "student": student_payload,
-            "grades": _build_grades_by_term(raw),
-            "grades_summary": _build_grades_summary(raw),
-            "curriculum": _build_curriculum_payload(raw, student_payload),
-        }
 
-    STUDENT_DB = records
+def _load_runtime_overrides(raw_records: dict[str, dict]) -> None:
+    runtime_state = load_runtime_state()
+    if not runtime_state:
+        return
+
+    account_metadata = runtime_state.get("account_metadata") or {}
+    raw_student_db = runtime_state.get("raw_student_db") or {}
+
+    if isinstance(account_metadata, dict):
+        ACCOUNT_METADATA.update(account_metadata)
+
+    if isinstance(raw_student_db, dict):
+        for mssv, raw_record in raw_student_db.items():
+            raw_records[mssv] = raw_record
+
+
+def _rebuild_student_record(mssv: str) -> None:
+    raw_record = RAW_STUDENT_DB[mssv]
+    STUDENT_DB[mssv] = _build_public_record(raw_record)
+
+
+def _ensure_loaded() -> None:
+    global RAW_STUDENT_DB, STUDENT_DB
+    if RAW_STUDENT_DB and STUDENT_DB:
+        return
+
+    RAW_STUDENT_DB = _load_initial_raw_records()
+    _load_runtime_overrides(RAW_STUDENT_DB)
+    STUDENT_DB = {
+        mssv: _build_public_record(raw_record)
+        for mssv, raw_record in RAW_STUDENT_DB.items()
+    }
+
+
+def _get_course_exclusion_map(raw_record: dict) -> dict[str, bool]:
+    return {
+        course["course_code"]: bool(course.get("is_excluded_from_gpa"))
+        for course in raw_record["curriculum_courses"]
+    }
+
+
+def _recalculate_transcript_terms(raw_record: dict) -> None:
+    transcript_courses = raw_record["transcript_courses"]
+    course_exclusions = _get_course_exclusion_map(raw_record)
+    term_order = [term["term"] for term in raw_record["transcript_terms"]]
+
+    grouped_courses: dict[str, list[dict]] = defaultdict(list)
+    for course in transcript_courses:
+        grouped_courses[course["term"]].append(course)
+
+    cumulative_10: list[tuple[float, int]] = []
+    cumulative_4: list[tuple[float, int]] = []
+    updated_terms: list[dict] = []
+
+    for term in term_order:
+        courses = grouped_courses.get(term, [])
+        registered_credits = sum(course["credits"] for course in courses)
+        earned_credits = sum(
+            course["credits"]
+            for course in courses
+            if course.get("final_score") is not None and course["final_score"] >= 5
+        )
+        failed_credits = sum(
+            course["credits"]
+            for course in courses
+            if course.get("final_score") is not None and course["final_score"] < 5
+        )
+
+        eligible_courses = [
+            course
+            for course in courses
+            if not course_exclusions.get(course["class_section_code"][:10], False)
+        ]
+        completed_eligible_courses = [
+            course
+            for course in eligible_courses
+            if course.get("final_score") is not None and course.get("gpa4") is not None
+        ]
+
+        term_is_completed = (
+            bool(eligible_courses)
+            and len(completed_eligible_courses) == len(eligible_courses)
+        )
+
+        gpa10_term = None
+        gpa4_term = None
+        if term_is_completed:
+            gpa10_term = weighted_average(
+                (course["final_score"], course["credits"])
+                for course in completed_eligible_courses
+            )
+            gpa4_term = weighted_average(
+                (course["gpa4"], course["credits"])
+                for course in completed_eligible_courses
+            )
+
+        cumulative_10.extend(
+            (course["final_score"], course["credits"])
+            for course in completed_eligible_courses
+        )
+        cumulative_4.extend(
+            (course["gpa4"], course["credits"])
+            for course in completed_eligible_courses
+        )
+
+        gpa10_cumulative = weighted_average(cumulative_10) or 0.0
+        gpa4_cumulative = weighted_average(cumulative_4) or 0.0
+
+        updated_terms.append(
+            {
+                "term": term,
+                "gpa10_term": gpa10_term,
+                "gpa4_term": gpa4_term,
+                "gpa10_cumulative": gpa10_cumulative,
+                "gpa4_cumulative": gpa4_cumulative,
+                "registered_credits": registered_credits,
+                "earned_credits": earned_credits,
+                "passed_credits": earned_credits,
+                "outstanding_failed_credits": failed_credits,
+                "academic_standing_cumulative": (
+                    classify_academic_standing(gpa4_cumulative) or "Chưa xếp loại"
+                ),
+                "academic_standing_term": classify_academic_standing(gpa4_term),
+            }
+        )
+
+    raw_record["transcript_terms"] = updated_terms
+
+
+def get_student_records() -> dict[str, dict]:
+    _ensure_loaded()
     return STUDENT_DB
 
 
+def get_raw_student_payload(mssv: str) -> dict | None:
+    _ensure_loaded()
+    return RAW_STUDENT_DB.get(mssv)
+
+
 def get_available_accounts() -> list[dict]:
-    get_student_records()
+    _ensure_loaded()
     accounts = []
     for mssv, meta in ACCOUNT_METADATA.items():
         db_student = STUDENT_DB.get(mssv)
-        ho_ten = db_student["student"]["ho_ten"] if db_student else "Tài khoản Sinh viên mới"
+        ho_ten = db_student["student"]["ho_ten"] if db_student else "Tài khoản sinh viên mới"
         accounts.append(
             {
                 "mssv": mssv,
@@ -308,30 +548,62 @@ def get_available_accounts() -> list[dict]:
         )
     return accounts
 
-def validate_admin_login(username, password):
+
+def get_available_teacher_accounts() -> list[dict]:
+    return [
+        {
+            "username": username,
+            "password": teacher["password"],
+            "name": teacher["name"],
+            "department": teacher["department"],
+            "courses": [assignment["course_name"] for assignment in teacher["assignments"]],
+        }
+        for username, teacher in TEACHER_USERS.items()
+    ]
+
+
+def validate_admin_login(username: str, password: str):
     user = ADMIN_USERS.get(username)
     if user and user["password"] == password:
         return user
     return None
 
+
+def validate_teacher_login(username: str, password: str):
+    teacher = TEACHER_USERS.get(username)
+    if teacher and teacher["password"] == password:
+        return {
+            "username": username,
+            "name": teacher["name"],
+            "department": teacher["department"],
+            "title": teacher["title"],
+            "assigned_courses": len(teacher["assignments"]),
+        }
+    return None
+
+
 def get_all_students_for_admin():
-    get_student_records()
+    _ensure_loaded()
     result = []
     for mssv, meta in ACCOUNT_METADATA.items():
         stu = STUDENT_DB.get(mssv)
-        name = stu["student"]["ho_ten"] if stu else "Tài khoản Sinh viên mới"
-        result.append({
-            "mssv": mssv,
-            "ho_ten": name,
-            "trang_thai": meta.get("trang_thai", "Đang học"),
-            "ngay_sinh": meta.get("ngay_sinh", "")
-        })
+        name = stu["student"]["ho_ten"] if stu else "Tài khoản sinh viên mới"
+        result.append(
+            {
+                "mssv": mssv,
+                "ho_ten": name,
+                "trang_thai": meta.get("trang_thai", "Đang học"),
+                "ngay_sinh": meta.get("ngay_sinh", ""),
+            }
+        )
     return result
 
+
 def add_new_student(mssv, password, ho_ten="Sinh viên mới", ngay_sinh="01/01/2000"):
+    _ensure_loaded()
     if mssv in ACCOUNT_METADATA:
         return False, "MSSV đã tồn tại"
-        
+
     ACCOUNT_METADATA[mssv] = {
         "password": password,
         "ngay_sinh": ngay_sinh,
@@ -342,49 +614,34 @@ def add_new_student(mssv, password, ho_ten="Sinh viên mới", ngay_sinh="01/01/
         "dia_chi_thuong_tru": "",
         "dia_chi_tam_tru": "",
     }
-    
-    STUDENT_DB[mssv] = {
+
+    RAW_STUDENT_DB[mssv] = {
+        "schema_version": "1.0",
         "student": {
-            "mssv": mssv,
-            "ho_ten": ho_ten,
+            "student_id": mssv,
+            "full_name": ho_ten,
+            "class_name": "DHTH00A",
             "program_name": "Ngành mặc định",
-            "he_dao_tao": "Đại học chính quy",
-            "khoa_hoc": "2024",
-            "so_cmnd": "123456789",
-            "ngay_sinh": ngay_sinh,
-            "noi_sinh": "TP.HCM",
-            "gioi_tinh": "Nam",
-            "dan_toc": "Kinh",
-            "ton_giao": "Không",
-            "doan_vien": "Có",
-            "ngay_vao_doan": "26/03/2015",
-            "the_bhyt": "HD123456",
-            "han_bhyt": "31/12/2026",
-            "khu_vuc": "KV3",
-            "doi_tuong": "Không",
+            "faculty": "Khoa Công nghệ Thông tin",
+            "education_level": "Đại học",
+            "print_date": "2026-04-10",
         },
-        "grades": {},
-        "grades_summary": {
-            "gpa_tich_luy": 0.0,
-            "gpa_he_10": 0.0,
-            "tong_tin_chi": 0,
-            "tc_dat": 0,
-            "tc_tong": 140,
-            "tc_con_lai": 140,
-            "latest_completed_term": None,
-            "current_term": "HK1 (2024 - 2025)",
-            "previous_term_chart": None,
-            "semesters": [],
-            "gpa_history": [],
-        },
-        "curriculum": {"student": {"mssv": mssv, "ho_ten": ho_ten, "program_name": ""}, "semesters": [], "tong_tc": 0},
+        "curriculum_summary": deepcopy(DEFAULT_CURRICULUM_SUMMARY),
+        "curriculum_courses": [],
+        "transcript_terms": [],
+        "transcript_courses": [],
     }
+    _rebuild_student_record(mssv)
+    _persist_runtime_state()
     return True, "Tạo sinh viên thành công"
 
+
 def change_student_password(mssv, new_password):
+    _ensure_loaded()
     if mssv not in ACCOUNT_METADATA:
         return False, "Không tìm thấy sinh viên"
     ACCOUNT_METADATA[mssv]["password"] = new_password
+    _persist_runtime_state()
     return True, "Đổi mật khẩu thành công"
 
 
@@ -418,3 +675,197 @@ def validate_parent_login(ho_ten: str, mssv: str, ngay_sinh: str, sdt: str) -> d
         return student
 
     return None
+
+
+def _get_teacher_assignments(username: str) -> list[dict]:
+    teacher = TEACHER_USERS.get(username)
+    if not teacher:
+        raise ValueError("Giảng viên không tồn tại.")
+    return teacher["assignments"]
+
+
+def _get_assignment(username: str, course_code: str, term: str) -> dict | None:
+    for assignment in _get_teacher_assignments(username):
+        if assignment["course_code"] == course_code and assignment["term"] == term:
+            return assignment
+    return None
+
+
+def _get_teacher_course_rows(username: str, course_code: str | None = None, term: str | None = None) -> list[dict]:
+    _ensure_loaded()
+    assignments = _get_teacher_assignments(username)
+    allowed_keys = {
+        (assignment["course_code"], assignment["term"]): assignment
+        for assignment in assignments
+    }
+
+    rows: list[dict] = []
+    for mssv, raw_record in RAW_STUDENT_DB.items():
+        public_student = STUDENT_DB[mssv]["student"]
+        for course in raw_record["transcript_courses"]:
+            current_course_code = course["class_section_code"][:10]
+            current_term = course["term"]
+            if (current_course_code, current_term) not in allowed_keys:
+                continue
+            if course_code and current_course_code != course_code:
+                continue
+            if term and current_term != term:
+                continue
+
+            scores = extract_component_scores(course.get("midterm_scores"))
+            rows.append(
+                {
+                    "mssv": public_student["mssv"],
+                    "ho_ten": public_student["ho_ten"],
+                    "lop": public_student["lop"],
+                    "nganh": public_student["nganh"],
+                    "term": current_term,
+                    "course_code": current_course_code,
+                    "class_section_code": course["class_section_code"],
+                    "course_name": course["course_name"],
+                    "credits": course["credits"],
+                    "diem_qt": scores["diem_qt"],
+                    "diem_gk": scores["diem_gk"],
+                    "diem_ck": scores["diem_ck"],
+                    "diem_tk_10": course.get("final_score"),
+                    "diem_tk_4": course.get("gpa4"),
+                    "xep_loai": course.get("letter"),
+                    "xep_loai_chi_tiet": course.get("classification"),
+                    "trang_thai": _normalize_course_status(
+                        course.get("status"),
+                        course.get("final_score"),
+                    ),
+                }
+            )
+
+    rows.sort(key=lambda item: (get_term_sort_key(item["term"]), item["course_code"], item["mssv"]))
+    return rows
+
+
+def get_teacher_overview(username: str) -> dict:
+    rows = _get_teacher_course_rows(username)
+    unique_students = {row["mssv"] for row in rows}
+    graded_count = sum(1 for row in rows if row["diem_tk_10"] is not None)
+    pending_count = len(rows) - graded_count
+
+    return {
+        "teacher": validate_teacher_login(username, TEACHER_USERS[username]["password"]),
+        "summary": {
+            "assigned_courses": len(_get_teacher_assignments(username)),
+            "managed_students": len(unique_students),
+            "graded_entries": graded_count,
+            "pending_entries": pending_count,
+        },
+    }
+
+
+def get_teacher_courses(username: str) -> list[dict]:
+    assignments = _get_teacher_assignments(username)
+    rows = _get_teacher_course_rows(username)
+
+    grouped_rows: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for row in rows:
+        grouped_rows[(row["course_code"], row["term"])].append(row)
+
+    course_cards: list[dict] = []
+    for assignment in assignments:
+        key = (assignment["course_code"], assignment["term"])
+        course_rows = grouped_rows.get(key, [])
+        final_scores = [row["diem_tk_10"] for row in course_rows if row["diem_tk_10"] is not None]
+        course_cards.append(
+            {
+                "course_code": assignment["course_code"],
+                "course_name": assignment["course_name"],
+                "term": assignment["term"],
+                "student_count": len(course_rows),
+                "graded_count": len(final_scores),
+                "pending_count": len(course_rows) - len(final_scores),
+                "average_score": round(sum(final_scores) / len(final_scores), 2) if final_scores else None,
+            }
+        )
+
+    course_cards.sort(key=lambda item: (get_term_sort_key(item["term"]), item["course_code"]))
+    return course_cards
+
+
+def get_teacher_course_students(username: str, course_code: str, term: str) -> dict:
+    assignment = _get_assignment(username, course_code, term)
+    if not assignment:
+        raise ValueError("Giảng viên không được phân công môn học này.")
+
+    students = _get_teacher_course_rows(username, course_code=course_code, term=term)
+    return {
+        "course": {
+            "course_code": assignment["course_code"],
+            "course_name": assignment["course_name"],
+            "term": assignment["term"],
+        },
+        "students": students,
+    }
+
+
+def update_teacher_student_grade(
+    *,
+    username: str,
+    mssv: str,
+    term: str,
+    class_section_code: str,
+    diem_qt: float | None,
+    diem_gk: float | None,
+    diem_ck: float | None,
+) -> dict:
+    course_code = class_section_code[:10]
+    assignment = _get_assignment(username, course_code, term)
+    if not assignment:
+        raise ValueError("Giảng viên không được phép chỉnh sửa môn học này.")
+
+    raw_payload = get_raw_student_payload(mssv)
+    if not raw_payload:
+        raise ValueError("Không tìm thấy sinh viên.")
+
+    working_payload = deepcopy(raw_payload)
+    target_course = next(
+        (
+            course
+            for course in working_payload["transcript_courses"]
+            if course["term"] == term and course["class_section_code"] == class_section_code
+        ),
+        None,
+    )
+    if not target_course:
+        raise ValueError("Không tìm thấy học phần cần cập nhật điểm.")
+
+    grade_payload = build_course_grade(
+        {
+            "diem_qt": diem_qt,
+            "diem_gk": diem_gk,
+            "diem_ck": diem_ck,
+        }
+    )
+    target_course.update(
+        {
+            "final_score": grade_payload["final_score"],
+            "gpa4": grade_payload["gpa4"],
+            "letter": grade_payload["letter"],
+            "classification": grade_payload["classification"],
+            "status": grade_payload["status"],
+            "midterm_scores": serialize_component_scores(grade_payload),
+        }
+    )
+    _recalculate_transcript_terms(working_payload)
+
+    RAW_STUDENT_DB[mssv] = working_payload
+    _rebuild_student_record(mssv)
+    _persist_runtime_state()
+
+    return {
+        "student": STUDENT_DB[mssv]["student"],
+        "course": {
+            "course_code": course_code,
+            "class_section_code": class_section_code,
+            "course_name": assignment["course_name"],
+            "term": term,
+            **grade_payload,
+        },
+        "grades_summary": STUDENT_DB[mssv]["grades_summary"],
+    }

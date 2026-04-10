@@ -42,7 +42,12 @@ export const parentLogin = (ho_ten, mssv, ngay_sinh, sdt) =>
 export const adminLogin = (username, password) =>
   api.post('/auth/admin-login', { username, password });
 
+export const teacherLogin = (username, password) =>
+  api.post('/auth/teacher-login', { username, password });
+
 export const getAvailableAccounts = () => api.get('/auth/accounts');
+
+export const getAvailableTeachers = () => api.get('/auth/teachers');
 
 export const getAdminStudents = () => api.get('/admin/students');
 
@@ -50,5 +55,19 @@ export const createAdminStudent = (data) => api.post('/admin/students', data);
 
 export const updateAdminStudentPassword = (mssv, new_password) =>
   api.put(`/admin/students/${mssv}/password`, { new_password });
+
+export const getTeacherOverview = (username) =>
+  api.get('/teacher/overview', { params: { username } });
+
+export const getTeacherCourses = (username) =>
+  api.get('/teacher/courses', { params: { username } });
+
+export const getTeacherCourseStudents = (username, courseCode, term) =>
+  api.get(`/teacher/courses/${courseCode}/students`, {
+    params: { username, term },
+  });
+
+export const updateTeacherStudentGrade = (payload) =>
+  api.put('/teacher/grades', payload);
 
 export default api;

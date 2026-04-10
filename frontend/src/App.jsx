@@ -10,6 +10,7 @@ import Profile from './pages/Profile/Profile';
 import Grades from './pages/Grades/Grades';
 import Curriculum from './pages/Curriculum/Curriculum';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import TeacherDashboard from './pages/Teacher/TeacherDashboard';
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -62,7 +63,7 @@ function AdminLayout() {
     <div className="layout-wrapper" style={{ display: 'block', backgroundColor: '#f0f2f5' }}>
       <div style={{ background: '#fff', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
         <h1 style={{ fontSize: '1.25rem', color: 'var(--primary)', fontWeight: 'bold' }}>🛡️ IUH Portal - Phân Quyền Quản Trị</h1>
-        <button onClick={logout} style={{ padding: '8px 16px', background: 'var(--bg-hover)', border: 'none', borderRadius: 'var(--radius)', cursor: 'pointer', fontWeight: 'bold', color: 'var(--text)' }}>
+        <button onClick={logout} style={{ padding: '8px 16px', background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 'bold', color: 'var(--text)' }}>
           Đăng xuất
         </button>
       </div>
@@ -73,8 +74,35 @@ function AdminLayout() {
   );
 }
 
+function TeacherLayout() {
+  const { user, logout } = useAuth();
+
+  return (
+    <div className="layout-wrapper" style={{ display: 'block', background: 'linear-gradient(180deg, #f4f7fb 0%, #eef3f9 100%)' }}>
+      <div style={{ background: '#fff', padding: '18px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', gap: 16 }}>
+        <div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>IUH Portal</div>
+          <h1 style={{ fontSize: '1.35rem', color: 'var(--primary)', fontWeight: 800 }}>Không gian giảng viên</h1>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{user?.name || 'Giảng viên'}</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{user?.department || 'Bộ môn'}</div>
+          </div>
+          <button onClick={logout} style={{ padding: '10px 16px', background: 'var(--accent)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 700, color: 'var(--primary)' }}>
+            Đăng xuất
+          </button>
+        </div>
+      </div>
+      <main style={{ padding: '32px', maxWidth: '1440px', margin: '0 auto' }}>
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
 function AppRoutes() {
-  const { isParent, isAdmin } = useAuth();
+  const { isParent, isAdmin, isTeacher } = useAuth();
 
   return (
     <Routes>
@@ -84,6 +112,11 @@ function AppRoutes() {
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Route>
+        ) : isTeacher ? (
+          <Route element={<TeacherLayout />}>
+            <Route path="/teacher" element={<TeacherDashboard />} />
+            <Route path="*" element={<Navigate to="/teacher" replace />} />
           </Route>
         ) : (
           <Route element={<Layout />}>

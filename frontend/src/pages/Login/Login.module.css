@@ -31,7 +31,7 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 460px;
+  max-width: 560px;
 }
 
 .loginCard {
@@ -86,6 +86,7 @@
 .tabs {
   display: flex;
   border-bottom: 2px solid var(--border-light);
+  overflow-x: auto;
 }
 
 .tab {
@@ -98,6 +99,8 @@
   background: none;
   transition: all var(--transition-fast);
   position: relative;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .tab:hover {
@@ -319,6 +322,18 @@
   margin-top: 2px;
 }
 
+.accountCourses {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--primary);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.teacherHint {
+  border-left-color: #2c7a7b;
+}
+
 /* Parent login note */
 .parentNote {
   text-align: center;
@@ -356,5 +371,10 @@
 
   .loginHeader {
     padding: 24px 20px 22px;
+  }
+
+  .tab {
+    font-size: 0.8rem;
+    padding: 12px 10px;
   }
 }

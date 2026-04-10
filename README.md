@@ -1,48 +1,43 @@
 # IUH Student Portal & AI Academic Assistant
 
-Ứng dụng mô phỏng cổng thông tin sinh viên IUH với giao diện web hiện đại, hỗ trợ tra cứu hồ sơ, bảng điểm, chương trình khung và chatbot tư vấn học tập. Dự án hiện chạy theo mô hình frontend React + backend FastAPI, sử dụng dữ liệu JSON mẫu cho 2 sinh viên.
+Ứng dụng mô phỏng cổng thông tin sinh viên IUH với giao diện web hiện đại, hỗ trợ tra cứu hồ sơ, bảng điểm, chương trình khung, chatbot tư vấn học tập và không gian giảng viên để nhập, sửa điểm sinh viên.
 
-## Tính năng hiện có
+## Tính năng chính
 
-- Dashboard hiển thị GPA tích lũy, tín chỉ đã đạt, tín chỉ còn lại và biểu đồ GPA các môn của kỳ trước.
-- Hồ sơ sinh viên hiển thị đầy đủ thông tin cá nhân, liên hệ và tình trạng học tập.
-- Bảng điểm theo từng học kỳ, có GPA học kỳ, GPA tích lũy và xuất PDF.
-- Chương trình khung hiển thị theo học kỳ, phân biệt môn bắt buộc và tự chọn.
-- Chế độ phụ huynh cho phép theo dõi hồ sơ và kết quả học tập của sinh viên.
-- Chatbot hỗ trợ trả lời các câu hỏi học vụ cơ bản theo dữ liệu mock hiện tại.
-
-## Dữ liệu hiện tại
-
-- Dữ liệu sinh viên được đọc từ thư mục [data_json]
-- Hiện có 2 hồ sơ:
-  - `23630781` - `Trần Minh Khang` - `Khoa học máy tính`
-  - `23630761` - `Lê Gia Huy` - `Khoa học dữ liệu`
+- Sinh viên xem dashboard, hồ sơ, bảng điểm, chương trình khung và xuất PDF.
+- Phụ huynh đăng nhập theo thông tin xác thực của sinh viên để theo dõi kết quả học tập.
+- Quản trị viên cấp tài khoản sinh viên mới và đổi mật khẩu.
+- Giảng viên đăng nhập theo môn được phân công, xem danh sách sinh viên trong học phần, nhập điểm QT/GK/CK, sửa điểm và lưu ngay vào file JSON cục bộ.
 
 ## Công nghệ sử dụng
 
 - Frontend: React, Vite, Axios, CSS Modules
 - Backend: Python, FastAPI
+- Lưu trữ cục bộ: JSON file
 - Xuất PDF: `jspdf`, `jspdf-autotable`
 
-## Cấu trúc thư mục chính
+## Cấu trúc thư mục
 
-- [frontend]: giao diện người dùng
-- [backend]: API và lớp xử lý dữ liệu
-- [data_json]: dữ liệu chương trình khung, transcript và thông tin sinh viên
-- [RAG_docx]: tài liệu phục vụ hướng chatbot / RAG
+- `frontend/`: giao diện người dùng
+- `backend/`: API FastAPI, phân quyền và xử lý dữ liệu
+- `backend/storage/`: file JSON runtime được tạo khi giáo viên lưu điểm hoặc admin cập nhật dữ liệu
+- `data_json/`: dữ liệu sinh viên mẫu ban đầu
+- `database/`: tài nguyên PostgreSQL cũ, không còn bắt buộc cho luồng hiện tại
+- `RAG_docx/`: tài liệu phục vụ chatbot / RAG
 
 ## Cài đặt và chạy dự án
 
-### 1. Chạy backend
+### 1. Backend
 
 ```bash
 cd backend
+python -m pip install -r requirements.txt
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend mặc định chạy ở `http://localhost:8000`.
+Backend mặc định chạy tại `http://localhost:8000`.
 
-### 2. Chạy frontend
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -50,14 +45,35 @@ npm install
 npm run dev
 ```
 
-Frontend mặc định chạy ở `http://localhost:5173`.
+Frontend mặc định chạy tại `http://localhost:5173`.
 
-## Tài khoản đăng nhập hiện tại
+## Cách lưu dữ liệu mới
+
+- Dữ liệu gốc vẫn được nạp từ `data_json/`.
+- Khi giáo viên nhập/sửa điểm hoặc admin thêm sinh viên, đổi mật khẩu, backend sẽ tự tạo file:
+
+```text
+backend/storage/portal_state.json
+```
+
+- File này chứa toàn bộ dữ liệu runtime đã chỉnh sửa.
+- Muốn reset về dữ liệu ban đầu, chỉ cần xóa file `backend/storage/portal_state.json` rồi chạy lại backend.
+
+## Tài khoản demo
 
 ### Sinh viên
 
 1. `23630781` / `23630781`
 2. `23630761` / `23630761`
+
+### Quản trị viên
+
+1. `admin` / `admin`
+
+### Giảng viên
+
+1. `gvungdung` / `gvungdung`
+2. `gvaiml` / `gvaiml`
 
 ### Phụ huynh
 
@@ -66,16 +82,15 @@ Frontend mặc định chạy ở `http://localhost:5173`.
 
 Lưu ý: cần nhập đúng CAPTCHA trên màn hình đăng nhập.
 
-## Ghi chú triển khai hiện tại
+## Ghi chú triển khai
 
-- Dự án chưa dùng cơ sở dữ liệu, toàn bộ dữ liệu đang lấy từ JSON.
-- Thông báo và chatbot vẫn đang dùng mock data / mock response.
-- Dữ liệu chương trình khung có các nhóm tự chọn; phần tổng tín chỉ trên UI được tính theo số tổng hợp chính thức trong hồ sơ sinh viên, không cộng toàn bộ mọi lựa chọn tự chọn.
+- Dữ liệu điểm giáo viên lưu trên máy cục bộ, phù hợp cho demo và đồ án chạy nhanh.
+- Nếu muốn quay lại bản lưu trữ database sau này, có thể tách riêng một lớp persistence khác mà không cần đổi UI.
 
 ## Nhóm phát triển
 
 - Thành viên 1: Nguyễn Xuân Thiên (23630781)
 - Thành viên 2: Nguyễn Bá Đức (23732881)
 - Thành viên 3: Trần Duy Khang (23728961)
-- Thành viên 4: Nguyễn Viết Minh (23724081)
+- Thành viên 4: Nguyễn Việt Minh (23724081)
 - Thành viên 5: Hoàng Trọng Nghĩa (23630761)

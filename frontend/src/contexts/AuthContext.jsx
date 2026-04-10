@@ -4,7 +4,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [role, setRole] = useState(null); // 'student' | 'parent'
+  const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,9 +34,10 @@ export function AuthProvider({ children }) {
 
   const isParent = role === 'parent';
   const isAdmin = role === 'admin';
+  const isTeacher = role === 'teacher';
 
   return (
-    <AuthContext.Provider value={{ user, role, isParent, isAdmin, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, role, isParent, isAdmin, isTeacher, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
