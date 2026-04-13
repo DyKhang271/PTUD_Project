@@ -5,6 +5,9 @@ services:
       - "8000:8000"
     environment:
       - ALLOWED_ORIGINS=http://localhost:8080
+    volumes:
+      - ./data_json:/data_json:ro
+      - ./backend/storage:/app/storage
 
   frontend:
     build: ./frontend

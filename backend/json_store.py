@@ -5,8 +5,8 @@ from copy import deepcopy
 from pathlib import Path
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-STORAGE_DIR = BASE_DIR / "backend" / "storage"
+BASE_DIR = Path(__file__).resolve().parent
+STORAGE_DIR = BASE_DIR / "storage"
 STATE_FILE = STORAGE_DIR / "portal_state.json"
 
 

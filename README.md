@@ -25,9 +25,13 @@
 - `database/`: tài nguyên PostgreSQL cũ, không còn bắt buộc cho luồng hiện tại
 - `RAG_docx/`: tài liệu phục vụ chatbot / RAG
 
-## Cài đặt và chạy dự án
+## Cai dat va chay du an
 
-### 1. Backend
+Ban co 2 cach chay:
+
+### Cach 1: Chay backend va frontend rieng
+
+Backend:
 
 ```bash
 cd backend
@@ -35,9 +39,7 @@ python -m pip install -r requirements.txt
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Backend mặc định chạy tại `http://localhost:8000`.
-
-### 2. Frontend
+Frontend:
 
 ```bash
 cd frontend
@@ -45,7 +47,19 @@ npm install
 npm run dev
 ```
 
-Frontend mặc định chạy tại `http://localhost:5173`.
+Truy cap frontend: `http://localhost:5173`
+API: `http://localhost:8000`
+
+### Cach 2: Chay bang Docker
+
+```bash
+docker compose up --build
+```
+
+Truy cap frontend: `http://localhost:8080`
+API: `http://localhost:8000`
+
+Luu y: neu chay Docker thi frontend KHONG o cong 5173.
 
 ## Cách lưu dữ liệu mới
 
@@ -94,3 +108,5 @@ Lưu ý: cần nhập đúng CAPTCHA trên màn hình đăng nhập.
 - Thành viên 3: Trần Duy Khang (23728961)
 - Thành viên 4: Nguyễn Việt Minh (23724081)
 - Thành viên 5: Hoàng Trọng Nghĩa (23630761)
+
+
