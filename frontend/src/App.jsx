@@ -60,14 +60,14 @@ function Layout() {
 function AdminLayout() {
   const { logout } = useAuth();
   return (
-    <div className="layout-wrapper" style={{ display: 'block', backgroundColor: '#f0f2f5' }}>
-      <div style={{ background: '#fff', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-        <h1 style={{ fontSize: '1.25rem', color: 'var(--primary)', fontWeight: 'bold' }}>🛡️ IUH Portal - Phân Quyền Quản Trị</h1>
+    <div className="layout-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f0f2f5' }}>
+      <div style={{ background: '#fff', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', zIndex: 10 }}>
+        <h1 style={{ fontSize: '1.25rem', color: 'var(--primary)', fontWeight: 'bold', margin: 0 }}>🛡️ IUH Portal - Phân Quyền Quản Trị</h1>
         <button onClick={logout} style={{ padding: '8px 16px', background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 'bold', color: 'var(--text)' }}>
           Đăng xuất
         </button>
       </div>
-      <main style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+      <main style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <Outlet />
       </main>
     </div>

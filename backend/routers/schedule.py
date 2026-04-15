@@ -1,9 +1,8 @@
 from fastapi import APIRouter
-from mock_data.schedule import SCHEDULE_DATA
+from student_data_store import get_all_schedule_admin
 
 router = APIRouter(prefix="/api", tags=["schedule"])
 
-
 @router.get("/schedule")
 def get_schedule():
-    return SCHEDULE_DATA
+    return get_all_schedule_admin()

@@ -12,9 +12,13 @@ from grade_logic import (
     get_term_sort_key,
     serialize_component_scores,
     serialize_detailed_component_scores,
+    update_grade_weights,
     weighted_average,
 )
+import uuid
 from json_store import load_runtime_state, save_runtime_state
+from mock_data.schedule import SCHEDULE_DATA
+from mock_data.notifications import NOTIFICATIONS_DATA
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -131,8 +135,18 @@ DEFAULT_CURRICULUM_SUMMARY = {
     "note": "Dữ liệu sinh viên mới được khởi tạo trong hệ thống quản trị.",
 }
 
+SYSTEM_CONFIG = {
+    "grading_weights": {
+        "diem_qt": 0.2,
+        "diem_gk": 0.3,
+        "diem_ck": 0.5,
+    }
+}
+
 RAW_STUDENT_DB: dict[str, dict] = {}
 STUDENT_DB: dict[str, dict] = {}
+SCHEDULE_DB: list[dict] = deepcopy(SCHEDULE_DATA)
+NOTIFICATIONS_DB: list[dict] = deepcopy(NOTIFICATIONS_DATA)
 
 
 def _load_json(path: Path) -> dict:
@@ -143,6 +157,10 @@ def _persist_runtime_state() -> None:
     save_runtime_state(
         account_metadata=ACCOUNT_METADATA,
         raw_student_db=RAW_STUDENT_DB,
+        system_config=SYSTEM_CONFIG,
+        teacher_users=TEACHER_USERS,
+        schedule_db=SCHEDULE_DB,
+        notifications_db=NOTIFICATIONS_DB,
     )
 
 
@@ -315,6 +333,15 @@ def _build_grades_summary(record: dict) -> dict:
         "current_term": current_term.get("term"),
         "latest_completed_term": latest_completed.get("term"),
         "previous_term_chart": _build_previous_term_chart(record),
+        "gpa_history": [
+            {
+                "term": term["term"],
+                "gpa4_term": term.get("gpa4_term", 0) or 0,
+                "gpa4_cumulative": term.get("gpa4_cumulative", 0) or 0,
+            }
+            for term in transcript_terms
+            if term.get("gpa4_term") is not None
+        ],
     }
 
 
@@ -399,17 +426,38 @@ def _load_initial_raw_records() -> dict[str, dict]:
 def _load_runtime_overrides(raw_records: dict[str, dict]) -> None:
     runtime_state = load_runtime_state()
     if not runtime_state:
+        update_grade_weights(SYSTEM_CONFIG["grading_weights"])
         return
 
     account_metadata = runtime_state.get("account_metadata") or {}
     raw_student_db = runtime_state.get("raw_student_db") or {}
+    sys_conf = runtime_state.get("system_config") or {}
+    teacher_users = runtime_state.get("teacher_users") or {}
+    schedule_db = runtime_state.get("schedule_db")
+    notifications_db = runtime_state.get("notifications_db")
+
+    if sys_conf:
+        SYSTEM_CONFIG.update(sys_conf)
+    
+    update_grade_weights(SYSTEM_CONFIG.get("grading_weights", {}))
 
     if isinstance(account_metadata, dict):
         ACCOUNT_METADATA.update(account_metadata)
 
+    if isinstance(teacher_users, dict) and teacher_users:
+        TEACHER_USERS.update(teacher_users)
+
     if isinstance(raw_student_db, dict):
         for mssv, raw_record in raw_student_db.items():
             raw_records[mssv] = raw_record
+            
+    if schedule_db is not None:
+        global SCHEDULE_DB
+        SCHEDULE_DB = schedule_db
+
+    if notifications_db is not None:
+        global NOTIFICATIONS_DB
+        NOTIFICATIONS_DB = notifications_db
 
 
 def _rebuild_student_record(mssv: str) -> None:
@@ -647,6 +695,58 @@ def change_student_password(mssv, new_password):
     ACCOUNT_METADATA[mssv]["password"] = new_password
     _persist_runtime_state()
     return True, "Đổi mật khẩu thành công"
+
+
+def get_all_teachers_for_admin():
+    _ensure_loaded()
+    return [
+        {
+            "username": username,
+            "name": teacher["name"],
+            "department": teacher.get("department", ""),
+            "title": teacher.get("title", ""),
+            "assignments_count": len(teacher.get("assignments", [])),
+        }
+        for username, teacher in TEACHER_USERS.items()
+    ]
+
+
+def add_new_teacher(username, password, name, department, title):
+    _ensure_loaded()
+    if username in TEACHER_USERS:
+        return False, "Tài khoản giảng viên đã tồn tại"
+
+    TEACHER_USERS[username] = {
+        "password": password,
+        "name": name,
+        "department": department,
+        "title": title,
+        "assignments": [],
+    }
+    _persist_runtime_state()
+    return True, "Thêm giảng viên thành công"
+
+
+def change_teacher_password(username, new_password):
+    _ensure_loaded()
+    if username not in TEACHER_USERS:
+        return False, "Không tìm thấy giảng viên"
+    TEACHER_USERS[username]["password"] = new_password
+    _persist_runtime_state()
+    return True, "Đổi mật khẩu giảng viên thành công"
+
+
+def get_current_system_config():
+    _ensure_loaded()
+    return SYSTEM_CONFIG
+
+
+def update_system_config(new_config):
+    _ensure_loaded()
+    SYSTEM_CONFIG.update(new_config)
+    update_grade_weights(SYSTEM_CONFIG.get("grading_weights", {}))
+    _persist_runtime_state()
+    return True, "Cập nhật cấu hình thành công"
 
 
 def get_student_record(mssv: str | None) -> dict:
@@ -1011,3 +1111,242 @@ def import_teacher_course_grades(
         "updated_students": sorted(updated_students),
         "errors": errors[:20],
     }
+
+
+def get_teacher_assignments_admin(username: str) -> list[dict]:
+    _ensure_loaded()
+    teacher = TEACHER_USERS.get(username)
+    if not teacher:
+        return []
+    return teacher.get("assignments", [])
+
+
+def assign_course_to_teacher(username: str, course_code: str, course_name: str, term: str) -> tuple[bool, str]:
+    _ensure_loaded()
+    teacher = TEACHER_USERS.get(username)
+    if not teacher:
+        return False, "Không tìm thấy giảng viên."
+
+    for assignment in teacher.get("assignments", []):
+        if assignment["course_code"] == course_code and assignment["term"] == term:
+            return False, "Giảng viên đã được phân công lớp học phần này."
+
+    teacher.setdefault("assignments", []).append({
+        "course_code": course_code,
+        "course_name": course_name,
+        "term": term,
+    })
+    _persist_runtime_state()
+    return True, "Phân công thành công."
+
+
+def remove_course_from_teacher(username: str, course_code: str, term: str) -> tuple[bool, str]:
+    _ensure_loaded()
+    teacher = TEACHER_USERS.get(username)
+    if not teacher:
+        return False, "Không tìm thấy giảng viên."
+
+    assignments = teacher.get("assignments", [])
+    original_count = len(assignments)
+    teacher["assignments"] = [
+        a for a in assignments
+        if not (a["course_code"] == course_code and a["term"] == term)
+    ]
+
+    if len(teacher["assignments"]) == original_count:
+        return False, "Không tìm thấy phân công lớp này."
+
+    _persist_runtime_state()
+    return True, "Hủy phân công lớp thành công."
+
+
+# --- CÁC HÀM QUẢN LÝ SINH VIÊN MỞ RỘNG (PROFILE, BULK, DELETE) ---
+
+def update_student_profile(mssv: str, data: dict) -> tuple[bool, str]:
+    _ensure_loaded()
+    if mssv not in ACCOUNT_METADATA:
+        return False, "Không tìm thấy sinh viên"
+    
+    # Update Metadata
+    ACCOUNT_METADATA[mssv].update({
+        "ngay_sinh": data.get("ngay_sinh", ACCOUNT_METADATA[mssv].get("ngay_sinh")),
+        "gioi_tinh": data.get("gioi_tinh", ACCOUNT_METADATA[mssv].get("gioi_tinh")),
+        "trang_thai": data.get("trang_thai", ACCOUNT_METADATA[mssv].get("trang_thai")),
+    })
+
+    # Update RAW DB
+    raw = RAW_STUDENT_DB[mssv]
+    raw["student"].update({
+        "full_name": data.get("ho_ten", raw["student"]["full_name"]),
+        "class_name": data.get("lop", raw["student"]["class_name"]),
+        "faculty": data.get("khoa", raw["student"]["faculty"]),
+        "program_name": data.get("nganh", raw["student"]["program_name"]),
+    })
+
+    _rebuild_student_record(mssv)
+    _persist_runtime_state()
+    return True, "Cập nhật hồ sơ sinh viên thành công."
+
+def delete_student_profile(mssv: str) -> tuple[bool, str]:
+    _ensure_loaded()
+    if mssv not in ACCOUNT_METADATA:
+        return False, "Không tìm thấy sinh viên"
+    
+    ACCOUNT_METADATA[mssv]["trang_thai"] = "Đã thôi học / Xóa"
+    _rebuild_student_record(mssv)
+    _persist_runtime_state()
+    return True, "Đã khoá / xoá mềm tài khoản sinh viên."
+
+def bulk_add_students(students: list[dict]) -> tuple[bool, str]:
+    _ensure_loaded()
+    count = 0
+    for st in students:
+        mssv = st.get("mssv", "").strip()
+        if not mssv or mssv in ACCOUNT_METADATA:
+            continue
+        
+        ACCOUNT_METADATA[mssv] = {
+            "password": st.get("password") or st.get("mssv"),
+            "ngay_sinh": st.get("ngay_sinh", "01/01/2000"),
+            "gioi_tinh": st.get("gioi_tinh", "Nam"),
+            "khoa_hoc": st.get("khoa_hoc", "2024-2028"),
+            "trang_thai": "Đang học",
+            "sdt": "",
+            "dia_chi_thuong_tru": "",
+            "dia_chi_tam_tru": "",
+        }
+
+        RAW_STUDENT_DB[mssv] = {
+            "schema_version": "1.0",
+            "student": {
+                "student_id": mssv,
+                "full_name": st.get("ho_ten", "Sinh viên mới"),
+                "class_name": st.get("lop", "Lớp tự do"),
+                "program_name": st.get("nganh", "Ngành mặc định"),
+                "faculty": st.get("khoa", "Khoa CNTT"),
+                "education_level": "Đại học",
+                "print_date": "2026-04-10",
+            },
+            "curriculum_summary": deepcopy(DEFAULT_CURRICULUM_SUMMARY),
+            "curriculum_courses": [],
+            "transcript_terms": [],
+            "transcript_courses": [],
+        }
+        _rebuild_student_record(mssv)
+        count += 1
+        
+    _persist_runtime_state()
+    return True, f"Nhập thành công {count} sinh viên."
+
+# --- CÁC HÀM QUẢN LÝ GIẢNG VIÊN MỞ RỘNG (PROFILE, BULK, DELETE) ---
+
+def update_teacher_profile(username: str, data: dict) -> tuple[bool, str]:
+    _ensure_loaded()
+    if username not in TEACHER_USERS:
+        return False, "Không tìm thấy giảng viên"
+    
+    teacher = TEACHER_USERS[username]
+    teacher["name"] = data.get("name", teacher.get("name"))
+    teacher["department"] = data.get("department", teacher.get("department"))
+    teacher["title"] = data.get("title", teacher.get("title"))
+    
+    _persist_runtime_state()
+    return True, "Cập nhật giảng viên thành công."
+
+def delete_teacher_profile(username: str) -> tuple[bool, str]:
+    _ensure_loaded()
+    if username not in TEACHER_USERS:
+        return False, "Không tìm thấy giảng viên"
+    # Xoá cứng giảng viên
+    del TEACHER_USERS[username]
+    _persist_runtime_state()
+    return True, "Xóa tài khoản giảng viên thành công."
+
+def bulk_add_teachers(teachers: list[dict]) -> tuple[bool, str]:
+    _ensure_loaded()
+    count = 0
+    for t in teachers:
+        username = t.get("username", "").strip()
+        if not username or username in TEACHER_USERS:
+            continue
+            
+        TEACHER_USERS[username] = {
+            "password": t.get("password") or t.get("username"),
+            "name": t.get("name", "Giảng viên"),
+            "department": t.get("department", "Bộ môn chung"),
+            "title": t.get("title", "Giảng viên"),
+            "assignments": [],
+        }
+        count += 1
+    
+    _persist_runtime_state()
+    return True, f"Nhập thành công {count} giảng viên."
+
+
+# --- THỜI KHÓA BIỂU CRUD ---
+def get_all_schedule_admin() -> list[dict]:
+    _ensure_loaded()
+    return SCHEDULE_DB
+
+def add_schedule_item(data: dict) -> tuple[bool, str]:
+    _ensure_loaded()
+    new_id = data.get("id") or str(uuid.uuid4())
+    data["id"] = new_id
+    SCHEDULE_DB.append(data)
+    _persist_runtime_state()
+    return True, "Thêm lớp học phần thành công."
+
+def update_schedule_item(item_id: str, data: dict) -> tuple[bool, str]:
+    _ensure_loaded()
+    for item in SCHEDULE_DB:
+        if str(item.get("id")) == str(item_id):
+            item.update(data)
+            _persist_runtime_state()
+            return True, "Cập nhật thời khóa biểu thành công."
+    return False, "Không tìm thấy lớp học phần."
+
+def delete_schedule_item(item_id: str) -> tuple[bool, str]:
+    _ensure_loaded()
+    global SCHEDULE_DB
+    original_len = len(SCHEDULE_DB)
+    SCHEDULE_DB = [item for item in SCHEDULE_DB if str(item.get("id")) != str(item_id)]
+    
+    if len(SCHEDULE_DB) < original_len:
+        _persist_runtime_state()
+        return True, "Xóa lớp học phần thành công."
+    return False, "Không tìm thấy lớp học phần."
+
+
+# --- THÔNG BÁO CRUD ---
+def get_all_notifications_admin() -> list[dict]:
+    _ensure_loaded()
+    return NOTIFICATIONS_DB
+
+def add_notification_admin(data: dict) -> tuple[bool, str]:
+    _ensure_loaded()
+    new_id = data.get("id") or str(uuid.uuid4())
+    data["id"] = new_id
+    NOTIFICATIONS_DB.insert(0, data)
+    _persist_runtime_state()
+    return True, "Đăng thông báo thành công."
+
+def update_notification_admin(item_id: str, data: dict) -> tuple[bool, str]:
+    _ensure_loaded()
+    for item in NOTIFICATIONS_DB:
+        if str(item.get("id")) == str(item_id):
+            item.update(data)
+            _persist_runtime_state()
+            return True, "Sửa thông báo thành công."
+    return False, "Không tìm thấy thông báo."
+
+def delete_notification_admin(item_id: str) -> tuple[bool, str]:
+    _ensure_loaded()
+    global NOTIFICATIONS_DB
+    original_len = len(NOTIFICATIONS_DB)
+    NOTIFICATIONS_DB = [item for item in NOTIFICATIONS_DB if str(item.get("id")) != str(item_id)]
+    
+    if len(NOTIFICATIONS_DB) < original_len:
+        _persist_runtime_state()
+        return True, "Xóa thông báo thành công."
+    return False, "Không tìm thấy thông báo."
+

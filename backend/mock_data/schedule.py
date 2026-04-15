@@ -1,5 +1,6 @@
 SCHEDULE_DATA = [
     {
+        "id": "COMP4030-2-1",
         "thu": 2,
         "tiet_bat_dau": 1,
         "tiet_ket_thuc": 3,
@@ -10,6 +11,7 @@ SCHEDULE_DATA = [
         "mau": "#4a90d9",
     },
     {
+        "id": "COMP4035-2-7",
         "thu": 2,
         "tiet_bat_dau": 7,
         "tiet_ket_thuc": 9,
@@ -20,6 +22,7 @@ SCHEDULE_DATA = [
         "mau": "#e67e22",
     },
     {
+        "id": "COMP4028-3-1",
         "thu": 3,
         "tiet_bat_dau": 1,
         "tiet_ket_thuc": 3,
@@ -30,6 +33,7 @@ SCHEDULE_DATA = [
         "mau": "#28a745",
     },
     {
+        "id": "COMP3050-3-4",
         "thu": 3,
         "tiet_bat_dau": 4,
         "tiet_ket_thuc": 5,
@@ -40,6 +44,7 @@ SCHEDULE_DATA = [
         "mau": "#9b59b6",
     },
     {
+        "id": "COMP4030-4-1",
         "thu": 4,
         "tiet_bat_dau": 1,
         "tiet_ket_thuc": 3,
@@ -50,6 +55,7 @@ SCHEDULE_DATA = [
         "mau": "#4a90d9",
     },
     {
+        "id": "COMP4090-4-7",
         "thu": 4,
         "tiet_bat_dau": 7,
         "tiet_ket_thuc": 9,
@@ -60,6 +66,7 @@ SCHEDULE_DATA = [
         "mau": "#e74c3c",
     },
     {
+        "id": "COMP3050-5-4",
         "thu": 5,
         "tiet_bat_dau": 4,
         "tiet_ket_thuc": 5,
@@ -70,6 +77,7 @@ SCHEDULE_DATA = [
         "mau": "#9b59b6",
     },
     {
+        "id": "COMP4035-5-7",
         "thu": 5,
         "tiet_bat_dau": 7,
         "tiet_ket_thuc": 9,
@@ -80,6 +88,7 @@ SCHEDULE_DATA = [
         "mau": "#e67e22",
     },
     {
+        "id": "COMP4028-6-1",
         "thu": 6,
         "tiet_bat_dau": 1,
         "tiet_ket_thuc": 3,
@@ -90,6 +99,7 @@ SCHEDULE_DATA = [
         "mau": "#28a745",
     },
     {
+        "id": "COMP4090-7-1",
         "thu": 7,
         "tiet_bat_dau": 1,
         "tiet_ket_thuc": 3,

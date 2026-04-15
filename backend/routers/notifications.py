@@ -1,9 +1,8 @@
 from fastapi import APIRouter
-from mock_data.notifications import NOTIFICATIONS_DATA
+from student_data_store import get_all_notifications_admin
 
 router = APIRouter(prefix="/api", tags=["notifications"])
 
-
 @router.get("/notifications")
 def get_notifications():
-    return NOTIFICATIONS_DATA
+    return get_all_notifications_admin()

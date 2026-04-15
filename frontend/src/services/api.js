@@ -73,4 +73,44 @@ export const updateTeacherStudentGrade = (payload) =>
 export const importTeacherStudentGrades = (payload) =>
   api.post('/teacher/grades/import', payload);
 
+export const getSystemConfig = () => api.get('/admin/system/config');
+
+export const updateSystemConfig = (data) => api.put('/admin/system/config', data);
+
+export const getAdminTeachers = () => api.get('/admin/teachers');
+
+export const createAdminTeacher = (data) => api.post('/admin/teachers', data);
+
+export const updateAdminTeacherPassword = (username, new_password) =>
+  api.put(`/admin/teachers/${username}/password`, { new_password });
+
+export const getAdminTeacherAssignments = (username) => 
+  api.get(`/admin/teachers/${username}/assignments`);
+
+export const assignCourseToTeacher = (username, payload) => 
+  api.post(`/admin/teachers/${username}/assignments`, payload);
+
+export const removeCourseFromTeacher = (username, courseCode, term) => 
+  api.delete(`/admin/teachers/${username}/assignments`, {
+    params: { course_code: courseCode, term }
+  });
+
+export const updateAdminStudent = (mssv, data) => api.put(`/admin/students/${mssv}`, data);
+export const deleteAdminStudent = (mssv) => api.delete(`/admin/students/${mssv}`);
+export const bulkImportAdminStudents = (data) => api.post('/admin/students/bulk', data);
+
+export const updateAdminTeacher = (username, data) => api.put(`/admin/teachers/${username}`, data);
+export const deleteAdminTeacher = (username) => api.delete(`/admin/teachers/${username}`);
+export const bulkImportAdminTeachers = (data) => api.post('/admin/teachers/bulk', data);
+
+export const getAdminSchedule = () => api.get('/admin/schedule');
+export const createAdminSchedule = (data) => api.post('/admin/schedule', data);
+export const updateAdminSchedule = (id, data) => api.put(`/admin/schedule/${id}`, data);
+export const deleteAdminSchedule = (id) => api.delete(`/admin/schedule/${id}`);
+
+export const getAdminNotifications = () => api.get('/admin/notifications');
+export const createAdminNotification = (data) => api.post('/admin/notifications', data);
+export const updateAdminNotification = (id, data) => api.put(`/admin/notifications/${id}`, data);
+export const deleteAdminNotification = (id) => api.delete(`/admin/notifications/${id}`);
+
 export default api;

@@ -27,6 +27,12 @@ GRADE_ORDER_TO_COMPONENT = {
 }
 
 
+def update_grade_weights(new_weights: dict) -> None:
+    for key, value in new_weights.items():
+        if key in GRADE_WEIGHTS:
+            GRADE_WEIGHTS[key] = float(value)
+
+
 def round_score(value: float | None) -> float | None:
     if value is None:
         return None
