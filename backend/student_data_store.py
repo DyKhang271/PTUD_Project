@@ -8,9 +8,10 @@ from pathlib import Path
 from grade_logic import (
     build_course_grade,
     classify_academic_standing,
-    extract_component_scores,
+    extract_detailed_component_scores,
     get_term_sort_key,
     serialize_component_scores,
+    serialize_detailed_component_scores,
     weighted_average,
 )
 from json_store import load_runtime_state, save_runtime_state
@@ -239,7 +240,10 @@ def _build_grades_by_term(record: dict) -> dict[str, dict]:
                     "class_section_code": course["class_section_code"],
                     "ten_mon": course["course_name"],
                     "tc": course["credits"],
-                    **extract_component_scores(course.get("midterm_scores")),
+                    **extract_detailed_component_scores(
+                        course.get("component_scores"),
+                        course.get("midterm_scores"),
+                    ),
                     "diem_tk_10": course.get("final_score"),
                     "diem_tk_4": course.get("gpa4"),
                     "xep_loai": course.get("letter") or "-",
@@ -712,7 +716,10 @@ def _get_teacher_course_rows(username: str, course_code: str | None = None, term
             if term and current_term != term:
                 continue
 
-            scores = extract_component_scores(course.get("midterm_scores"))
+            scores = extract_detailed_component_scores(
+                course.get("component_scores"),
+                course.get("midterm_scores"),
+            )
             rows.append(
                 {
                     "mssv": public_student["mssv"],
@@ -724,6 +731,10 @@ def _get_teacher_course_rows(username: str, course_code: str | None = None, term
                     "class_section_code": course["class_section_code"],
                     "course_name": course["course_name"],
                     "credits": course["credits"],
+                    "diem_thuong_ky_1": scores["diem_thuong_ky_1"],
+                    "diem_thuong_ky_2": scores["diem_thuong_ky_2"],
+                    "diem_thuc_hanh_1": scores["diem_thuc_hanh_1"],
+                    "diem_thuc_hanh_2": scores["diem_thuc_hanh_2"],
                     "diem_qt": scores["diem_qt"],
                     "diem_gk": scores["diem_gk"],
                     "diem_ck": scores["diem_ck"],
@@ -804,12 +815,59 @@ def get_teacher_course_students(username: str, course_code: str, term: str) -> d
     }
 
 
+def _find_transcript_course(
+    working_payload: dict,
+    *,
+    term: str,
+    course_code: str,
+    class_section_code: str | None = None,
+) -> dict:
+    matches = [
+        course
+        for course in working_payload["transcript_courses"]
+        if course["term"] == term and course["class_section_code"][:10] == course_code
+    ]
+
+    if class_section_code:
+        matches = [
+            course
+            for course in matches
+            if course["class_section_code"] == class_section_code
+        ]
+
+    if not matches:
+        raise ValueError("Khong tim thay hoc phan can cap nhat diem.")
+    if len(matches) > 1:
+        raise ValueError(
+            "Tim thay nhieu lop hoc phan trung ma mon. Vui long bo sung class_section_code trong file CSV."
+        )
+    return matches[0]
+
+
+def _apply_grade_payload_to_course(target_course: dict, grade_payload: dict) -> None:
+    target_course.update(
+        {
+            "final_score": grade_payload["final_score"],
+            "gpa4": grade_payload["gpa4"],
+            "letter": grade_payload["letter"],
+            "classification": grade_payload["classification"],
+            "status": grade_payload["status"],
+            "midterm_scores": serialize_component_scores(grade_payload),
+            "component_scores": serialize_detailed_component_scores(grade_payload),
+        }
+    )
+
+
 def update_teacher_student_grade(
     *,
     username: str,
     mssv: str,
     term: str,
     class_section_code: str,
+    diem_thuong_ky_1: float | None,
+    diem_thuong_ky_2: float | None,
+    diem_thuc_hanh_1: float | None,
+    diem_thuc_hanh_2: float | None,
     diem_qt: float | None,
     diem_gk: float | None,
     diem_ck: float | None,
@@ -824,34 +882,25 @@ def update_teacher_student_grade(
         raise ValueError("Không tìm thấy sinh viên.")
 
     working_payload = deepcopy(raw_payload)
-    target_course = next(
-        (
-            course
-            for course in working_payload["transcript_courses"]
-            if course["term"] == term and course["class_section_code"] == class_section_code
-        ),
-        None,
+    target_course = _find_transcript_course(
+        working_payload,
+        term=term,
+        course_code=course_code,
+        class_section_code=class_section_code,
     )
-    if not target_course:
-        raise ValueError("Không tìm thấy học phần cần cập nhật điểm.")
 
     grade_payload = build_course_grade(
         {
+            "diem_thuong_ky_1": diem_thuong_ky_1,
+            "diem_thuong_ky_2": diem_thuong_ky_2,
+            "diem_thuc_hanh_1": diem_thuc_hanh_1,
+            "diem_thuc_hanh_2": diem_thuc_hanh_2,
             "diem_qt": diem_qt,
             "diem_gk": diem_gk,
             "diem_ck": diem_ck,
         }
     )
-    target_course.update(
-        {
-            "final_score": grade_payload["final_score"],
-            "gpa4": grade_payload["gpa4"],
-            "letter": grade_payload["letter"],
-            "classification": grade_payload["classification"],
-            "status": grade_payload["status"],
-            "midterm_scores": serialize_component_scores(grade_payload),
-        }
-    )
+    _apply_grade_payload_to_course(target_course, grade_payload)
     _recalculate_transcript_terms(working_payload)
 
     RAW_STUDENT_DB[mssv] = working_payload
@@ -868,4 +917,97 @@ def update_teacher_student_grade(
             **grade_payload,
         },
         "grades_summary": STUDENT_DB[mssv]["grades_summary"],
+    }
+
+
+def import_teacher_course_grades(
+    *,
+    username: str,
+    course_code: str,
+    term: str,
+    rows: list[dict],
+) -> dict:
+    assignment = _get_assignment(username, course_code, term)
+    if not assignment:
+        raise ValueError("Giảng viên không được phân công môn học này.")
+    if not rows:
+        raise ValueError("File CSV không có dòng dữ liệu hợp lệ.")
+
+    imported_count = 0
+    errors: list[dict] = []
+    updated_students: set[str] = set()
+
+    for index, row in enumerate(rows, start=1):
+        row_number = row.get("row_number") or index + 1
+        mssv = str(row.get("mssv") or "").strip()
+        if not mssv:
+            errors.append(
+                {
+                    "row_number": row_number,
+                    "message": "Thiếu MSSV.",
+                }
+            )
+            continue
+
+        raw_payload = get_raw_student_payload(mssv)
+        if not raw_payload:
+            errors.append(
+                {
+                    "row_number": row_number,
+                    "mssv": mssv,
+                    "message": "Không tìm thấy sinh viên trong hệ thống.",
+                }
+            )
+            continue
+
+        working_payload = deepcopy(raw_payload)
+
+        try:
+            target_course = _find_transcript_course(
+                working_payload,
+                term=term,
+                course_code=course_code,
+                class_section_code=row.get("class_section_code"),
+            )
+            grade_payload = build_course_grade(
+                {
+                    "diem_thuong_ky_1": row.get("diem_thuong_ky_1"),
+                    "diem_thuong_ky_2": row.get("diem_thuong_ky_2"),
+                    "diem_thuc_hanh_1": row.get("diem_thuc_hanh_1"),
+                    "diem_thuc_hanh_2": row.get("diem_thuc_hanh_2"),
+                    "diem_qt": row.get("diem_qt"),
+                    "diem_gk": row.get("diem_gk"),
+                    "diem_ck": row.get("diem_ck"),
+                }
+            )
+            _apply_grade_payload_to_course(target_course, grade_payload)
+            _recalculate_transcript_terms(working_payload)
+        except ValueError as exc:
+            errors.append(
+                {
+                    "row_number": row_number,
+                    "mssv": mssv,
+                    "message": str(exc),
+                }
+            )
+            continue
+
+        RAW_STUDENT_DB[mssv] = working_payload
+        _rebuild_student_record(mssv)
+        updated_students.add(mssv)
+        imported_count += 1
+
+    if imported_count:
+        _persist_runtime_state()
+
+    return {
+        "course": {
+            "course_code": assignment["course_code"],
+            "course_name": assignment["course_name"],
+            "term": assignment["term"],
+        },
+        "imported_count": imported_count,
+        "error_count": len(errors),
+        "updated_students": sorted(updated_students),
+        "errors": errors[:20],
     }

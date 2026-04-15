@@ -6,9 +6,12 @@ export default function CourseRosterPanel({
   onSelectCourse,
   students,
   loading,
+  importing,
   searchText,
   onSearchTextChange,
   onEditStudent,
+  onImportCsv,
+  onDownloadTemplate,
 }) {
   return (
     <div className={styles.layout}>
@@ -51,13 +54,32 @@ export default function CourseRosterPanel({
             <div className={styles.sidebarEyebrow}>Bảng điểm lớp học phần</div>
             <h3>Danh sách sinh viên</h3>
           </div>
-          <input
-            className={styles.search}
-            type="text"
-            value={searchText}
-            onChange={(e) => onSearchTextChange(e.target.value)}
-            placeholder="Tìm MSSV hoặc họ tên"
-          />
+          <div className={styles.toolbar}>
+            <input
+              className={styles.search}
+              type="text"
+              value={searchText}
+              onChange={(e) => onSearchTextChange(e.target.value)}
+              placeholder="Tìm MSSV hoặc họ tên"
+            />
+            <button type="button" className={styles.templateButton} onClick={onDownloadTemplate}>
+              Tải mẫu CSV
+            </button>
+            <label className={styles.importButton}>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => {
+                  const [file] = e.target.files || [];
+                  if (file) {
+                    onImportCsv(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
+              {importing ? 'Đang nhập...' : 'Nhập từ CSV'}
+            </label>
+          </div>
         </div>
 
         <div className={styles.tableWrapper}>
@@ -67,11 +89,15 @@ export default function CourseRosterPanel({
                 <th>MSSV</th>
                 <th>Họ tên</th>
                 <th>Lớp</th>
-                <th>QT</th>
-                <th>GK</th>
-                <th>CK</th>
-                <th>TK(10)</th>
-                <th>TK(4)</th>
+                <th>Thường kỳ 1</th>
+                <th>Thường kỳ 2</th>
+                <th>Thực hành 1</th>
+                <th>Thực hành 2</th>
+                <th>Quá trình</th>
+                <th>Giữa kỳ</th>
+                <th>Cuối kỳ</th>
+                <th>Tổng kết (10)</th>
+                <th>Tổng kết (4)</th>
                 <th>Xếp loại</th>
                 <th>Trạng thái</th>
                 <th />
@@ -80,11 +106,13 @@ export default function CourseRosterPanel({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="11" className={styles.emptyCell}>Đang tải danh sách sinh viên...</td>
+                  <td colSpan="15" className={styles.emptyCell}>Đang tải danh sách sinh viên...</td>
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className={styles.emptyCell}>Chưa có sinh viên phù hợp với bộ lọc.</td>
+                  <td colSpan="15" className={styles.emptyCell}>
+                    Chưa có sinh viên phù hợp với bộ lọc.
+                  </td>
                 </tr>
               ) : (
                 students.map((student) => (
@@ -94,6 +122,10 @@ export default function CourseRosterPanel({
                       <div className={styles.nameCell}>{student.ho_ten}</div>
                     </td>
                     <td>{student.lop}</td>
+                    <td>{student.diem_thuong_ky_1 ?? '-'}</td>
+                    <td>{student.diem_thuong_ky_2 ?? '-'}</td>
+                    <td>{student.diem_thuc_hanh_1 ?? '-'}</td>
+                    <td>{student.diem_thuc_hanh_2 ?? '-'}</td>
                     <td>{student.diem_qt ?? '-'}</td>
                     <td>{student.diem_gk ?? '-'}</td>
                     <td>{student.diem_ck ?? '-'}</td>

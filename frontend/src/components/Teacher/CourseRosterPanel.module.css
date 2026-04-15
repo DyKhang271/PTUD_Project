@@ -104,6 +104,41 @@
   background: var(--bg);
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.templateButton,
+.importButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.templateButton {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.importButton {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: #fff;
+}
+
+.importButton input {
+  display: none;
+}
+
 .tableWrapper {
   overflow: auto;
 }
@@ -173,7 +208,16 @@
     align-items: stretch;
   }
 
+  .toolbar {
+    justify-content: stretch;
+  }
+
   .search {
+    width: 100%;
+  }
+
+  .templateButton,
+  .importButton {
     width: 100%;
   }
 }

@@ -7,7 +7,7 @@
 - Sinh viên xem dashboard, hồ sơ, bảng điểm, chương trình khung và xuất PDF.
 - Phụ huynh đăng nhập theo thông tin xác thực của sinh viên để theo dõi kết quả học tập.
 - Quản trị viên cấp tài khoản sinh viên mới và đổi mật khẩu.
-- Giảng viên đăng nhập theo môn được phân công, xem danh sách sinh viên trong học phần, nhập điểm QT/GK/CK, sửa điểm và lưu ngay vào file JSON cục bộ.
+- Giảng viên đăng nhập theo môn được phân công, xem danh sách sinh viên trong học phần, nhập điểm thường kỳ 1, thường kỳ 2, thực hành, QT/GK/CK, sửa điểm và import điểm hàng loạt bằng file CSV rồi lưu ngay vào file JSON cục bộ.
 
 ## Công nghệ sử dụng
 
@@ -73,6 +73,12 @@ backend/storage/portal_state.json
 - File này chứa toàn bộ dữ liệu runtime đã chỉnh sửa.
 - Muốn reset về dữ liệu ban đầu, chỉ cần xóa file `backend/storage/portal_state.json` rồi chạy lại backend.
 
+## Mau CSV nhap diem
+
+- Cac cot ho tro: `mssv`, `class_section_code`, `diem_thuong_ky_1`, `diem_thuong_ky_2`, `diem_thuc_hanh_1`, `diem_thuc_hanh_2`, `diem_qt`, `diem_gk`, `diem_ck`.
+- Giao vien co the tai mau CSV truc tiep trong man hinh dashboard giao vien.
+- Neu co nhap cac cot `diem_thuong_ky_*` hoac `diem_thuc_hanh_*`, he thong se tu tinh `diem_qt` bang trung binh cac cot nay. Neu de trong, he thong se dung gia tri `diem_qt` duoc nhap truc tiep.
+
 ## Tài khoản demo
 
 ### Sinh viên
@@ -97,7 +103,7 @@ backend/storage/portal_state.json
 Lưu ý: cần nhập đúng CAPTCHA trên màn hình đăng nhập.
 
 ## Ghi chú triển khai
-
+ 
 - Dữ liệu điểm giáo viên lưu trên máy cục bộ, phù hợp cho demo và đồ án chạy nhanh.
 - Nếu muốn quay lại bản lưu trữ database sau này, có thể tách riêng một lớp persistence khác mà không cần đổi UI.
 

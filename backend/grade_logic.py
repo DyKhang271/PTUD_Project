@@ -5,6 +5,13 @@ from typing import Iterable
 
 
 GRADE_COMPONENTS = ("diem_qt", "diem_gk", "diem_ck")
+PROCESS_GRADE_COMPONENTS = (
+    "diem_thuong_ky_1",
+    "diem_thuong_ky_2",
+    "diem_thuc_hanh_1",
+    "diem_thuc_hanh_2",
+)
+DETAILED_GRADE_COMPONENTS = PROCESS_GRADE_COMPONENTS + GRADE_COMPONENTS
 GRADE_WEIGHTS = {
     "diem_qt": 0.2,
     "diem_gk": 0.3,
@@ -24,6 +31,15 @@ def round_score(value: float | None) -> float | None:
     if value is None:
         return None
     return round(float(value), 2)
+
+
+def coerce_score(value: float | int | str | None) -> float | None:
+    if value in ("", None):
+        return None
+    try:
+        return round_score(float(value))
+    except (TypeError, ValueError):
+        return None
 
 
 def normalize_component_score(value: float | int | str | None) -> float | None:
@@ -48,6 +64,41 @@ def extract_component_scores(midterm_scores: Iterable[float] | None) -> dict[str
     return result
 
 
+def calculate_process_score(
+    scores: dict[str, float | None],
+    fallback_qt: float | int | str | None = None,
+) -> float | None:
+    process_scores = [
+        scores.get(component)
+        for component in PROCESS_GRADE_COMPONENTS
+        if scores.get(component) is not None
+    ]
+    if process_scores:
+        return round_score(sum(process_scores) / len(process_scores))
+    return normalize_component_score(fallback_qt)
+
+
+def extract_detailed_component_scores(
+    raw_scores: dict[str, float | int | str | None] | None = None,
+    midterm_scores: Iterable[float] | None = None,
+) -> dict[str, float | None]:
+    result = {component: None for component in DETAILED_GRADE_COMPONENTS}
+    raw_scores = raw_scores or {}
+
+    for component in DETAILED_GRADE_COMPONENTS:
+        result[component] = coerce_score(raw_scores.get(component))
+
+    legacy_scores = extract_component_scores(midterm_scores)
+    for component in GRADE_COMPONENTS:
+        if result[component] is None:
+            result[component] = legacy_scores.get(component)
+
+    if result["diem_qt"] is None:
+        result["diem_qt"] = calculate_process_score(result)
+
+    return result
+
+
 def serialize_component_scores(scores: dict[str, float | None]) -> list[float | None]:
     ordered_scores: list[float | None] = [
         round_score(scores.get(component)) for component in GRADE_COMPONENTS
@@ -66,10 +117,28 @@ def serialize_component_rows(scores: dict[str, float | None]) -> list[tuple[int,
     return rows
 
 
+def serialize_detailed_component_scores(scores: dict[str, float | None]) -> dict[str, float]:
+    serialized: dict[str, float] = {}
+    for component in DETAILED_GRADE_COMPONENTS:
+        score = round_score(scores.get(component))
+        if score is not None:
+            serialized[component] = score
+    return serialized
+
+
 def build_course_grade(scores: dict[str, float | None]) -> dict[str, float | str | None]:
-    normalized_scores = {
+    normalized_process_scores = {
         component: normalize_component_score(scores.get(component))
-        for component in GRADE_COMPONENTS
+        for component in PROCESS_GRADE_COMPONENTS
+    }
+    normalized_scores = {
+        **normalized_process_scores,
+        "diem_qt": calculate_process_score(
+            normalized_process_scores,
+            fallback_qt=scores.get("diem_qt"),
+        ),
+        "diem_gk": normalize_component_score(scores.get("diem_gk")),
+        "diem_ck": normalize_component_score(scores.get("diem_ck")),
     }
     final_score = calculate_final_score(normalized_scores)
 

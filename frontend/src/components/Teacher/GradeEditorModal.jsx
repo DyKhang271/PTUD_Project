@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import styles from './GradeEditorModal.module.css';
 
 function parseScore(value) {
@@ -8,25 +8,44 @@ function parseScore(value) {
   return Number(value);
 }
 
-function buildPreview({ diem_qt, diem_gk, diem_ck }) {
-  const qt = parseScore(diem_qt);
-  const gk = parseScore(diem_gk);
-  const ck = parseScore(diem_ck);
+function buildPreview(form) {
+  const scores = {
+    diem_thuong_ky_1: parseScore(form.diem_thuong_ky_1),
+    diem_thuong_ky_2: parseScore(form.diem_thuong_ky_2),
+    diem_thuc_hanh_1: parseScore(form.diem_thuc_hanh_1),
+    diem_thuc_hanh_2: parseScore(form.diem_thuc_hanh_2),
+    diem_qt: parseScore(form.diem_qt),
+    diem_gk: parseScore(form.diem_gk),
+    diem_ck: parseScore(form.diem_ck),
+  };
 
-  if ([qt, gk, ck].some((value) => value !== null && (value < 0 || value > 10))) {
+  if (Object.values(scores).some((value) => value !== null && (value < 0 || value > 10))) {
     return { error: 'Điểm phải nằm trong khoảng từ 0 đến 10.' };
   }
 
-  if ([qt, gk, ck].some((value) => value === null)) {
+  const processScores = [
+    scores.diem_thuong_ky_1,
+    scores.diem_thuong_ky_2,
+    scores.diem_thuc_hanh_1,
+    scores.diem_thuc_hanh_2,
+  ].filter((value) => value !== null);
+
+  const diemQt = processScores.length
+    ? Number((processScores.reduce((sum, value) => sum + value, 0) / processScores.length).toFixed(2))
+    : scores.diem_qt;
+
+  if ([diemQt, scores.diem_gk, scores.diem_ck].some((value) => value === null)) {
+    const hasPartialScore = Object.values(scores).some((value) => value !== null);
     return {
+      diemQt,
       finalScore: null,
       gpa4: null,
       letter: null,
-      status: qt !== null || gk !== null || ck !== null ? 'Đang nhập dở' : 'Chưa có điểm',
+      status: hasPartialScore ? 'Đang nhập dở' : 'Chưa có điểm',
     };
   }
 
-  const finalScore = Number((qt * 0.2 + gk * 0.3 + ck * 0.5).toFixed(2));
+  const finalScore = Number((diemQt * 0.2 + scores.diem_gk * 0.3 + scores.diem_ck * 0.5).toFixed(2));
   let gpa4 = 0;
   let letter = 'F';
 
@@ -57,6 +76,7 @@ function buildPreview({ diem_qt, diem_gk, diem_ck }) {
   }
 
   return {
+    diemQt,
     finalScore,
     gpa4,
     letter,
@@ -64,23 +84,20 @@ function buildPreview({ diem_qt, diem_gk, diem_ck }) {
   };
 }
 
-export default function GradeEditorModal({ record, saving, onClose, onSubmit }) {
-  const [form, setForm] = useState({
-    diem_qt: '',
-    diem_gk: '',
-    diem_ck: '',
-  });
+function buildInitialForm(record) {
+  return {
+    diem_thuong_ky_1: record?.diem_thuong_ky_1 ?? '',
+    diem_thuong_ky_2: record?.diem_thuong_ky_2 ?? '',
+    diem_thuc_hanh_1: record?.diem_thuc_hanh_1 ?? '',
+    diem_thuc_hanh_2: record?.diem_thuc_hanh_2 ?? '',
+    diem_qt: record?.diem_qt ?? '',
+    diem_gk: record?.diem_gk ?? '',
+    diem_ck: record?.diem_ck ?? '',
+  };
+}
 
-  useEffect(() => {
-    if (!record) {
-      return;
-    }
-    setForm({
-      diem_qt: record.diem_qt ?? '',
-      diem_gk: record.diem_gk ?? '',
-      diem_ck: record.diem_ck ?? '',
-    });
-  }, [record]);
+export default function GradeEditorModal({ record, saving, onClose, onSubmit }) {
+  const [form, setForm] = useState(() => buildInitialForm(record));
 
   const preview = useMemo(() => buildPreview(form), [form]);
 
@@ -88,15 +105,24 @@ export default function GradeEditorModal({ record, saving, onClose, onSubmit }) 
     return null;
   }
 
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (preview.error) {
       return;
     }
+
     onSubmit({
       mssv: record.mssv,
       term: record.term,
       class_section_code: record.class_section_code,
+      diem_thuong_ky_1: parseScore(form.diem_thuong_ky_1),
+      diem_thuong_ky_2: parseScore(form.diem_thuong_ky_2),
+      diem_thuc_hanh_1: parseScore(form.diem_thuc_hanh_1),
+      diem_thuc_hanh_2: parseScore(form.diem_thuc_hanh_2),
       diem_qt: parseScore(form.diem_qt),
       diem_gk: parseScore(form.diem_gk),
       diem_ck: parseScore(form.diem_ck),
@@ -120,14 +146,58 @@ export default function GradeEditorModal({ record, saving, onClose, onSubmit }) 
         <form onSubmit={handleSubmit}>
           <div className={styles.grid}>
             <label className={styles.field}>
-              <span>Điểm quá trình</span>
+              <span>Điểm thường kỳ 1</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={form.diem_thuong_ky_1}
+                onChange={(e) => updateField('diem_thuong_ky_1', e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Điểm thường kỳ 2</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={form.diem_thuong_ky_2}
+                onChange={(e) => updateField('diem_thuong_ky_2', e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Điểm thực hành 1</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={form.diem_thuc_hanh_1}
+                onChange={(e) => updateField('diem_thuc_hanh_1', e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Điểm thực hành 2</span>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={form.diem_thuc_hanh_2}
+                onChange={(e) => updateField('diem_thuc_hanh_2', e.target.value)}
+              />
+            </label>
+            <label className={styles.field}>
+              <span>Điểm quá trình tổng hợp</span>
               <input
                 type="number"
                 min="0"
                 max="10"
                 step="0.1"
                 value={form.diem_qt}
-                onChange={(e) => setForm((prev) => ({ ...prev, diem_qt: e.target.value }))}
+                onChange={(e) => updateField('diem_qt', e.target.value)}
               />
             </label>
             <label className={styles.field}>
@@ -138,7 +208,7 @@ export default function GradeEditorModal({ record, saving, onClose, onSubmit }) 
                 max="10"
                 step="0.1"
                 value={form.diem_gk}
-                onChange={(e) => setForm((prev) => ({ ...prev, diem_gk: e.target.value }))}
+                onChange={(e) => updateField('diem_gk', e.target.value)}
               />
             </label>
             <label className={styles.field}>
@@ -149,16 +219,22 @@ export default function GradeEditorModal({ record, saving, onClose, onSubmit }) 
                 max="10"
                 step="0.1"
                 value={form.diem_ck}
-                onChange={(e) => setForm((prev) => ({ ...prev, diem_ck: e.target.value }))}
+                onChange={(e) => updateField('diem_ck', e.target.value)}
               />
             </label>
           </div>
 
           <div className={styles.note}>
-            Trọng số đang áp dụng: QT 20% • GK 30% • CK 50%. Khi lưu, dữ liệu sẽ được ghi vào file JSON cục bộ và làm mới bảng điểm sinh viên.
+            Nếu có nhập điểm thường kỳ hoặc điểm thực hành, hệ thống sẽ tự tính điểm quá trình
+            bằng trung bình các cột này. Nếu để trống, hệ thống sẽ dùng ô “Điểm quá trình tổng
+            hợp”. Tổng kết vẫn áp dụng trọng số: quá trình 20%, giữa kỳ 30%, cuối kỳ 50%.
           </div>
 
           <div className={styles.preview}>
+            <div className={styles.previewCard}>
+              <span>Điểm quá trình</span>
+              <strong>{preview.diemQt ?? '--'}</strong>
+            </div>
             <div className={styles.previewCard}>
               <span>Tổng kết hệ 10</span>
               <strong>{preview.finalScore ?? '--'}</strong>

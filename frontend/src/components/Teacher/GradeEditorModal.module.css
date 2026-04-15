@@ -10,7 +10,7 @@
 }
 
 .modal {
-  width: min(720px, 100%);
+  width: min(920px, 100%);
   background: #fff;
   border-radius: 24px;
   box-shadow: 0 30px 60px rgba(15, 23, 42, 0.2);
@@ -55,7 +55,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
 }
 
@@ -86,7 +86,7 @@
 
 .preview {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-top: 20px;
 }

@@ -70,4 +70,7 @@ export const getTeacherCourseStudents = (username, courseCode, term) =>
 export const updateTeacherStudentGrade = (payload) =>
   api.put('/teacher/grades', payload);
 
+export const importTeacherStudentGrades = (payload) =>
+  api.post('/teacher/grades/import', payload);
+
 export default api;
