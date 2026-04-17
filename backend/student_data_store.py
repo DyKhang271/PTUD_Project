@@ -16,13 +16,17 @@ from grade_logic import (
     weighted_average,
 )
 import uuid
-from json_store import load_runtime_state, save_runtime_state
+from json_store import is_database_store_enabled, load_runtime_state, save_runtime_state
 from mock_data.schedule import SCHEDULE_DATA
 from mock_data.notifications import NOTIFICATIONS_DATA
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data_json"
+DEFAULT_DATA_FILES = [
+    DATA_DIR / "thien_khmt_student_schema.json",
+    DATA_DIR / "nghia_khdl_student_schema.json",
+]
 
 ADMIN_USERS = {
     "admin": {
@@ -118,11 +122,6 @@ ACCOUNT_METADATA = {
     },
 }
 
-DATA_FILES = [
-    DATA_DIR / "thien_khmt_student_schema.json",
-    DATA_DIR / "nghia_khdl_student_schema.json",
-]
-
 COURSE_TYPE_LABELS = {
     "mandatory": "Bắt buộc",
     "elective": "Tự chọn",
@@ -143,14 +142,51 @@ SYSTEM_CONFIG = {
     }
 }
 
+DEFAULT_TEACHER_USERS = deepcopy(TEACHER_USERS)
+DEFAULT_ACCOUNT_METADATA = deepcopy(ACCOUNT_METADATA)
+DEFAULT_SYSTEM_CONFIG = deepcopy(SYSTEM_CONFIG)
+DEFAULT_SCHEDULE_DB = deepcopy(SCHEDULE_DATA)
+DEFAULT_NOTIFICATIONS_DB = deepcopy(NOTIFICATIONS_DATA)
+
 RAW_STUDENT_DB: dict[str, dict] = {}
 STUDENT_DB: dict[str, dict] = {}
-SCHEDULE_DB: list[dict] = deepcopy(SCHEDULE_DATA)
-NOTIFICATIONS_DB: list[dict] = deepcopy(NOTIFICATIONS_DATA)
+SCHEDULE_DB: list[dict] = deepcopy(DEFAULT_SCHEDULE_DB)
+NOTIFICATIONS_DB: list[dict] = deepcopy(DEFAULT_NOTIFICATIONS_DB)
 
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _reset_runtime_defaults() -> None:
+    global ACCOUNT_METADATA, TEACHER_USERS, SYSTEM_CONFIG, SCHEDULE_DB, NOTIFICATIONS_DB
+
+    ACCOUNT_METADATA = deepcopy(DEFAULT_ACCOUNT_METADATA)
+    TEACHER_USERS = deepcopy(DEFAULT_TEACHER_USERS)
+    SYSTEM_CONFIG = deepcopy(DEFAULT_SYSTEM_CONFIG)
+    SCHEDULE_DB = deepcopy(DEFAULT_SCHEDULE_DB)
+    NOTIFICATIONS_DB = deepcopy(DEFAULT_NOTIFICATIONS_DB)
+
+
+def _resolve_data_files() -> list[Path]:
+    existing_default_files = [path for path in DEFAULT_DATA_FILES if path.exists()]
+    if existing_default_files:
+        return existing_default_files
+
+    discovered_files: list[Path] = []
+    for pattern in ("*_student_schema.json", "*_from_transcript.json", "*.json"):
+        for path in sorted(DATA_DIR.glob(pattern)):
+            if path not in discovered_files:
+                discovered_files.append(path)
+
+    if discovered_files:
+        return discovered_files
+
+    expected_names = ", ".join(path.name for path in DEFAULT_DATA_FILES)
+    raise FileNotFoundError(
+        f"Khong tim thay file JSON du lieu trong {DATA_DIR}. "
+        f"Cac ten mac dinh duoc mong doi: {expected_names}"
+    )
 
 
 def _persist_runtime_state() -> None:
@@ -206,11 +242,20 @@ def _get_metadata(mssv: str) -> dict:
     )
 
 
+def _get_curriculum_summary(record: dict) -> dict:
+    summary = deepcopy(DEFAULT_CURRICULUM_SUMMARY)
+    for key, value in (record.get("curriculum_summary") or {}).items():
+        if value is not None:
+            summary[key] = value
+    return summary
+
+
 def _build_student_payload(record: dict) -> dict:
     student = record["student"]
     transcript_terms = record["transcript_terms"]
     latest_completed = _get_latest_completed_term(transcript_terms) or {}
     metadata = _get_metadata(student["student_id"])
+    curriculum_summary = _get_curriculum_summary(record)
 
     return {
         "mssv": student["student_id"],
@@ -232,7 +277,7 @@ def _build_student_payload(record: dict) -> dict:
         "gpa_tich_luy": latest_completed.get("gpa4_cumulative"),
         "xep_loai": latest_completed.get("academic_standing_cumulative"),
         "tc_hoan_thanh": latest_completed.get("earned_credits", 0),
-        "tc_tong": record["curriculum_summary"]["total_required_credits"],
+        "tc_tong": curriculum_summary["total_required_credits"],
         "avatar_url": None,
     }
 
@@ -258,6 +303,19 @@ def _build_grades_by_term(record: dict) -> dict[str, dict]:
                     "class_section_code": course["class_section_code"],
                     "ten_mon": course["course_name"],
                     "tc": course["credits"],
+                    "regular_scores": [
+                        round(float(score), 2)
+                        for score in (course.get("regular_scores") or [])
+                        if score is not None
+                    ],
+                    "practice_scores": [
+                        round(float(score), 2)
+                        for score in (course.get("practice_scores") or [])
+                        if score is not None
+                    ],
+                    "midterm_score": course.get("midterm_score"),
+                    "final_exam_score": course.get("final_exam_score"),
+                    "tbqt_score": course.get("tbqt_score"),
                     **extract_detailed_component_scores(
                         course.get("component_scores"),
                         course.get("midterm_scores"),
@@ -310,12 +368,13 @@ def _build_grades_summary(record: dict) -> dict:
     transcript_terms = record["transcript_terms"]
     latest_completed = _get_latest_completed_term(transcript_terms) or {}
     current_term = transcript_terms[-1] if transcript_terms else {}
+    curriculum_summary = _get_curriculum_summary(record)
     tc_dang_hoc = max(
         (current_term.get("registered_credits") or 0) - (current_term.get("earned_credits") or 0),
         0,
     )
     tc_con_lai = max(
-        record["curriculum_summary"]["total_required_credits"]
+        curriculum_summary["total_required_credits"]
         - (latest_completed.get("earned_credits") or 0)
         - tc_dang_hoc,
         0,
@@ -328,7 +387,7 @@ def _build_grades_summary(record: dict) -> dict:
         "tc_dang_hoc": tc_dang_hoc,
         "tc_con_lai": tc_con_lai,
         "tc_rot": latest_completed.get("outstanding_failed_credits", 0),
-        "tc_tong": record["curriculum_summary"]["total_required_credits"],
+        "tc_tong": curriculum_summary["total_required_credits"],
         "semesters": [term["term"] for term in transcript_terms],
         "current_term": current_term.get("term"),
         "latest_completed_term": latest_completed.get("term"),
@@ -346,6 +405,7 @@ def _build_grades_summary(record: dict) -> dict:
 
 
 def _build_curriculum_payload(record: dict, student_payload: dict) -> dict:
+    curriculum_summary = _get_curriculum_summary(record)
     transcript_courses_by_code: dict[str, list[dict]] = defaultdict(list)
     for course in record["transcript_courses"]:
         transcript_courses_by_code[course["class_section_code"][:10]].append(course)
@@ -400,7 +460,7 @@ def _build_curriculum_payload(record: dict, student_payload: dict) -> dict:
             "ho_ten": student_payload["ho_ten"],
             "program_name": student_payload["program_name"],
         },
-        "summary": record["curriculum_summary"],
+        "summary": curriculum_summary,
         "semesters": semesters,
     }
 
@@ -417,17 +477,17 @@ def _build_public_record(raw_record: dict) -> dict:
 
 def _load_initial_raw_records() -> dict[str, dict]:
     records: dict[str, dict] = {}
-    for data_file in DATA_FILES:
+    for data_file in _resolve_data_files():
         raw = _load_json(data_file)
         records[raw["student"]["student_id"]] = raw
     return records
 
 
-def _load_runtime_overrides(raw_records: dict[str, dict]) -> None:
-    runtime_state = load_runtime_state()
+def _load_runtime_overrides(raw_records: dict[str, dict], runtime_state: dict | None = None) -> bool:
+    runtime_state = runtime_state if runtime_state is not None else load_runtime_state()
     if not runtime_state:
         update_grade_weights(SYSTEM_CONFIG["grading_weights"])
-        return
+        return False
 
     account_metadata = runtime_state.get("account_metadata") or {}
     raw_student_db = runtime_state.get("raw_student_db") or {}
@@ -448,8 +508,7 @@ def _load_runtime_overrides(raw_records: dict[str, dict]) -> None:
         TEACHER_USERS.update(teacher_users)
 
     if isinstance(raw_student_db, dict):
-        for mssv, raw_record in raw_student_db.items():
-            raw_records[mssv] = raw_record
+        raw_records.update(raw_student_db)
             
     if schedule_db is not None:
         global SCHEDULE_DB
@@ -458,6 +517,7 @@ def _load_runtime_overrides(raw_records: dict[str, dict]) -> None:
     if notifications_db is not None:
         global NOTIFICATIONS_DB
         NOTIFICATIONS_DB = notifications_db
+    return True
 
 
 def _rebuild_student_record(mssv: str) -> None:
@@ -467,15 +527,38 @@ def _rebuild_student_record(mssv: str) -> None:
 
 def _ensure_loaded() -> None:
     global RAW_STUDENT_DB, STUDENT_DB
-    if RAW_STUDENT_DB and STUDENT_DB:
+    if not is_database_store_enabled() and RAW_STUDENT_DB and STUDENT_DB:
         return
 
-    RAW_STUDENT_DB = _load_initial_raw_records()
-    _load_runtime_overrides(RAW_STUDENT_DB)
+    _reset_runtime_defaults()
+
+    if is_database_store_enabled():
+        runtime_state = load_runtime_state()
+        if not (runtime_state.get("raw_student_db") or {}):
+            save_runtime_state(
+                account_metadata=ACCOUNT_METADATA,
+                raw_student_db=_load_initial_raw_records(),
+                system_config=SYSTEM_CONFIG,
+                teacher_users=TEACHER_USERS,
+                schedule_db=SCHEDULE_DB,
+                notifications_db=NOTIFICATIONS_DB,
+            )
+            runtime_state = load_runtime_state()
+
+        RAW_STUDENT_DB = {}
+        _load_runtime_overrides(RAW_STUDENT_DB, runtime_state)
+    else:
+        RAW_STUDENT_DB = _load_initial_raw_records()
+        _load_runtime_overrides(RAW_STUDENT_DB)
+
     STUDENT_DB = {
         mssv: _build_public_record(raw_record)
         for mssv, raw_record in RAW_STUDENT_DB.items()
     }
+
+
+def initialize_store() -> None:
+    _ensure_loaded()
 
 
 def _get_course_exclusion_map(raw_record: dict) -> dict[str, bool]:
@@ -602,6 +685,7 @@ def get_available_accounts() -> list[dict]:
 
 
 def get_available_teacher_accounts() -> list[dict]:
+    _ensure_loaded()
     return [
         {
             "username": username,

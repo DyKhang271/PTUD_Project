@@ -1,17 +1,84 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: student_portal
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d student_portal"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/student_portal
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: gemma4:31b-cloud
+      RAG_DOCUMENTS_DIR: /rag_docs
+      PYTHONUNBUFFERED: "1"
     ports:
       - "8000:8000"
-    environment:
-      - ALLOWED_ORIGINS=http://localhost:8080
     volumes:
       - ./data_json:/data_json:ro
-      - ./backend/storage:/app/storage
+      - ./RAG_docx:/rag_docs:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/').read()",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
     ports:
       - "8080:80"
-    depends_on:
-      - backend
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -O - http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  postgres_data:
+  ollama_data:

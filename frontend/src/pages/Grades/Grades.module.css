@@ -211,6 +211,14 @@
   margin-bottom: 20px;
 }
 
+.tableHint {
+  padding: 14px 18px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  background: rgba(74, 144, 217, 0.06);
+  border-bottom: 1px solid var(--border-light);
+}
+
 .tableWrapper {
   overflow-x: auto;
 }

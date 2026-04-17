@@ -30,8 +30,10 @@ export const getGradesSummary = (mssv) =>
 export const getCurriculum = (mssv) =>
   api.get('/curriculum', withStudentParams(mssv));
 
-export const sendChatMessage = (message) =>
-  api.post('/chatbot', { message });
+export const sendChatMessage = (payload) =>
+  api.post('/chatbot', typeof payload === 'string' ? { message: payload } : payload, {
+    timeout: 30000,
+  });
 
 export const studentLogin = (mssv, password) =>
   api.post('/auth/student-login', { mssv, password });

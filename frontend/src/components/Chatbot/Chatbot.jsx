@@ -1,20 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 import styles from './Chatbot.module.css';
 
 const WELCOME_MESSAGE = {
   type: 'bot',
-  text: '👋 Xin chào! Tôi là trợ lý tư vấn học tập AI.\nHãy hỏi tôi về GPA, đăng ký môn học, lộ trình học tập hoặc bất kỳ vấn đề học tập nào nhé!',
+  text: 'Xin chào! Mình là trợ lý học vụ AI.\nBạn có thể hỏi mình về GPA, tín chỉ, chương trình khung, quy chế học vụ hoặc tiến độ tốt nghiệp.',
+  sources: [],
 };
 
+const buildSessionId = () => `chat-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
 export default function Chatbot() {
+  const { user, role } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+  const sessionIdRef = useRef(buildSessionId());
 
-  // Listen for openChatbot custom event from Sidebar
   useEffect(() => {
     const handler = () => setIsOpen(true);
     document.addEventListener('openChatbot', handler);
@@ -25,6 +30,9 @@ export default function Chatbot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  const studentId = user?.mssv || null;
+  const programName = user?.program_name || user?.nganh || user?.chuyen_nganh || null;
+
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isTyping) return;
@@ -34,14 +42,31 @@ export default function Chatbot() {
     setIsTyping(true);
 
     try {
-      // Delay for typing effect
-      await new Promise((r) => setTimeout(r, 800));
-      const res = await sendChatMessage(text);
-      setMessages((prev) => [...prev, { type: 'bot', text: res.data.reply }]);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const res = await sendChatMessage({
+        message: text,
+        student_id: studentId,
+        role,
+        session_id: sessionIdRef.current,
+        program_name: programName,
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: 'bot',
+          text: res.data.reply,
+          sources: res.data.sources || [],
+          intent: res.data.intent,
+        },
+      ]);
     } catch {
       setMessages((prev) => [
         ...prev,
-        { type: 'bot', text: '❌ Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.' },
+        {
+          type: 'bot',
+          text: 'Xin lỗi, hệ thống chatbot đang gặp lỗi. Bạn thử lại sau nhé.',
+          sources: [],
+        },
       ]);
     } finally {
       setIsTyping(false);
@@ -57,7 +82,6 @@ export default function Chatbot() {
 
   return (
     <>
-      {/* Floating bubble */}
       {!isOpen && (
         <button
           className={styles.bubble}
@@ -68,18 +92,16 @@ export default function Chatbot() {
         </button>
       )}
 
-      {/* Chat window */}
       {isOpen && (
         <>
           <div className={styles.overlay} onClick={() => setIsOpen(false)} />
           <div className={styles.chatWindow}>
-            {/* Header */}
             <div className={styles.chatHeader}>
               <div className={styles.chatHeaderLeft}>
                 <span className={styles.chatHeaderIcon}>🤖</span>
                 <div>
-                  <div className={styles.chatHeaderTitle}>Tư vấn học tập</div>
-                  <div className={styles.chatHeaderStatus}>● Đang hoạt động</div>
+                  <div className={styles.chatHeaderTitle}>Tư vấn học vụ AI</div>
+                  <div className={styles.chatHeaderStatus}>● Ollama + RAG + PostgreSQL</div>
                 </div>
               </div>
               <button className={styles.closeBtn} onClick={() => setIsOpen(false)}>
@@ -87,7 +109,6 @@ export default function Chatbot() {
               </button>
             </div>
 
-            {/* Messages */}
             <div className={styles.chatMessages}>
               {messages.map((msg, i) => (
                 <div
@@ -104,6 +125,15 @@ export default function Chatbot() {
                     }`}
                   >
                     {msg.text}
+                    {msg.type === 'bot' && msg.sources?.length > 0 && (
+                      <div className={styles.sources}>
+                        {msg.sources.map((source) => (
+                          <span key={source} className={styles.sourceTag}>
+                            {source}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -119,12 +149,11 @@ export default function Chatbot() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
             <div className={styles.chatInput}>
               <input
                 className={styles.inputField}
                 type="text"
-                placeholder="Nhập câu hỏi của bạn..."
+                placeholder="Nhập câu hỏi học vụ của bạn..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}

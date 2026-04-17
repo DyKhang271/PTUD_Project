@@ -5,6 +5,9 @@
 -- transcript_terms, transcript_courses, midterm_scores
 -- =========================================================
 
+DROP TABLE IF EXISTS app_runtime_state;
+DROP TABLE IF EXISTS student_raw_records;
+
 -- Drop in dependency order
 DROP TABLE IF EXISTS transcript_course_midterm_scores;
 DROP TABLE IF EXISTS transcript_courses;
@@ -12,6 +15,21 @@ DROP TABLE IF EXISTS transcript_terms;
 DROP TABLE IF EXISTS curriculum_courses;
 DROP TABLE IF EXISTS curriculum_summaries;
 DROP TABLE IF EXISTS students;
+
+CREATE TABLE student_raw_records (
+    student_id TEXT PRIMARY KEY,
+    payload JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_student_raw_records_payload
+    ON student_raw_records USING GIN (payload);
+
+CREATE TABLE app_runtime_state (
+    state_key TEXT PRIMARY KEY,
+    payload JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- 1) students
 CREATE TABLE students (

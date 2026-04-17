@@ -157,6 +157,25 @@
   border-bottom-right-radius: 4px;
 }
 
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sourceTag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--primary);
+  background: rgba(74, 144, 217, 0.08);
+  border: 1px solid rgba(74, 144, 217, 0.18);
+}
+
 /* Typing indicator */
 .typingDots {
   display: flex;

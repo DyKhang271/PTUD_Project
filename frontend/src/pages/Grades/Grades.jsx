@@ -1,7 +1,52 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getGrades, getGradesSummary, getStudent } from '../../services/api';
 import styles from './Grades.module.css';
+
+const buildScoreColumns = (courses) => {
+  const maxRegularCount = Math.max(0, ...courses.map((course) => (course.regular_scores || []).length));
+  const maxPracticeCount = Math.max(0, ...courses.map((course) => (course.practice_scores || []).length));
+  const columns = [];
+
+  for (let index = 0; index < maxRegularCount; index += 1) {
+    columns.push({ key: `regular_${index}`, label: `TK${index + 1}` });
+  }
+
+  for (let index = 0; index < maxPracticeCount; index += 1) {
+    columns.push({ key: `practice_${index}`, label: `TH${index + 1}` });
+  }
+
+  if (courses.some((course) => course.tbqt_score !== null && course.tbqt_score !== undefined)) {
+    columns.push({ key: 'tbqt_score', label: 'QT' });
+  }
+
+  if (courses.some((course) => course.midterm_score !== null && course.midterm_score !== undefined)) {
+    columns.push({ key: 'midterm_score', label: 'GK' });
+  }
+
+  if (courses.some((course) => course.final_exam_score !== null && course.final_exam_score !== undefined)) {
+    columns.push({ key: 'final_exam_score', label: 'CK' });
+  }
+
+  columns.push({ key: 'diem_tk_10', label: 'TK (10)' });
+  columns.push({ key: 'diem_tk_4', label: 'TK (4)' });
+
+  return columns;
+};
+
+const getColumnValue = (course, columnKey) => {
+  if (columnKey.startsWith('regular_')) {
+    const index = Number(columnKey.split('_')[1]);
+    return course.regular_scores?.[index] ?? '-';
+  }
+
+  if (columnKey.startsWith('practice_')) {
+    const index = Number(columnKey.split('_')[1]);
+    return course.practice_scores?.[index] ?? '-';
+  }
+
+  return course[columnKey] ?? '-';
+};
 
 export default function Grades() {
   const { user } = useAuth();
@@ -11,8 +56,8 @@ export default function Grades() {
   const [selectedSemester, setSelectedSemester] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -21,6 +66,7 @@ export default function Grades() {
         setDropdownOpen(false);
       }
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -39,7 +85,7 @@ export default function Grades() {
         setLoading(false);
       })
       .catch(() => {
-        setError('Không thể tải dữ liệu. Vui lòng thử lại.');
+        setError('Khong the tai du lieu. Vui long thu lai.');
         setLoading(false);
       });
   }, [user?.mssv]);
@@ -63,16 +109,22 @@ export default function Grades() {
 
   const getStatusBadge = (status) => {
     switch (status) {
+      case 'Dat':
       case 'Đạt':
         return styles.statusPass;
+      case 'Rot':
       case 'Rớt':
         return styles.statusFail;
+      case 'Dang hoc':
       case 'Đang học':
         return styles.statusCurrent;
       default:
         return '';
     }
   };
+
+  const courses = semesterData?.mon_hoc || [];
+  const scoreColumns = buildScoreColumns(courses);
 
   const handleExportPDF = async () => {
     const { jsPDF } = await import('jspdf');
@@ -93,23 +145,27 @@ export default function Grades() {
     doc.text(`Xep loai: ${summary?.xep_loai || ''}`, 200, 42);
     doc.text(`Hoc ky: ${semesterData?.hoc_ky || selectedSemester}`, 200, 49);
 
-    const tableData = (semesterData?.mon_hoc || []).map((course) => [
+    const tableData = courses.map((course) => [
       course.stt,
       course.ma_mon,
       course.ten_mon,
       course.tc,
-      course.diem_qt ?? '-',
-      course.diem_gk ?? '-',
-      course.diem_ck ?? '-',
-      course.diem_tk_10 ?? '-',
-      course.diem_tk_4 ?? '-',
+      ...scoreColumns.map((column) => getColumnValue(course, column.key)),
       course.xep_loai,
       course.trang_thai,
     ]);
 
     autoTable(doc, {
       startY: 58,
-      head: [['STT', 'Ma mon', 'Ten mon', 'TC', 'QT', 'GK', 'CK', 'TK(10)', 'TK(4)', 'Xep loai', 'Trang thai']],
+      head: [[
+        'STT',
+        'Ma mon',
+        'Ten mon',
+        'TC',
+        ...scoreColumns.map((column) => column.label),
+        'Xep loai',
+        'Trang thai',
+      ]],
       body: tableData,
       styles: { fontSize: 8, cellPadding: 3 },
       headStyles: { fillColor: [26, 60, 110], textColor: 255 },
@@ -132,35 +188,35 @@ export default function Grades() {
   if (error) {
     return (
       <div className={styles.grades}>
-        <div className="errorMessage">⚠️ {error}</div>
+        <div className="errorMessage">Warning: {error}</div>
       </div>
     );
   }
 
-  const percent = summary ? ((summary.tc_dat / summary.tc_tong) * 100).toFixed(1) : 0;
+  const percent = summary?.tc_tong ? ((summary.tc_dat / summary.tc_tong) * 100).toFixed(1) : 0;
 
   return (
     <div className={styles.grades}>
       <div className={styles.summaryRow}>
         <div className={styles.sumCard}>
-          <div className={`${styles.sumIcon} ${styles.sumIconGpa}`}>📈</div>
+          <div className={`${styles.sumIcon} ${styles.sumIconGpa}`}>GPA</div>
           <div className={styles.sumInfo}>
             <div className={styles.sumValue}>{summary?.gpa_tich_luy?.toFixed(2)}</div>
-            <div className={styles.sumLabel}>GPA tích lũy</div>
+            <div className={styles.sumLabel}>GPA tich luy</div>
           </div>
         </div>
         <div className={styles.sumCard}>
-          <div className={`${styles.sumIcon} ${styles.sumIconPass}`}>✅</div>
+          <div className={`${styles.sumIcon} ${styles.sumIconPass}`}>TC</div>
           <div className={styles.sumInfo}>
             <div className={styles.sumValue}>{summary?.tc_dat} TC</div>
-            <div className={styles.sumLabel}>Tín chỉ đã tích lũy</div>
+            <div className={styles.sumLabel}>Tin chi da tich luy</div>
           </div>
         </div>
         <div className={styles.sumCard}>
-          <div className={`${styles.sumIcon} ${styles.sumIconFail}`}>⏳</div>
+          <div className={`${styles.sumIcon} ${styles.sumIconFail}`}>HK</div>
           <div className={styles.sumInfo}>
             <div className={styles.sumValue}>{summary?.tc_dang_hoc} TC</div>
-            <div className={styles.sumLabel}>Tín chỉ đang học</div>
+            <div className={styles.sumLabel}>Tin chi dang hoc</div>
           </div>
         </div>
       </div>
@@ -168,27 +224,26 @@ export default function Grades() {
       <div className={styles.progressCard}>
         <div className={styles.progressLabel}>
           <span className={styles.progressText}>
-            Tiến độ tín chỉ: {summary?.tc_dat}/{summary?.tc_tong} TC
+            Tien do tin chi: {summary?.tc_dat}/{summary?.tc_tong} TC
           </span>
           <span className={styles.progressPercent}>{percent}%</span>
         </div>
         <div className={styles.progressBarOuter}>
-          <div
-            className={styles.progressBarInner}
-            style={{ width: `${percent}%` }}
-          />
+          <div className={styles.progressBarInner} style={{ width: `${percent}%` }} />
         </div>
       </div>
 
       <div className={styles.semesterSelector}>
-        <span className={styles.semesterLabel}>📅 Chọn học kỳ:</span>
+        <span className={styles.semesterLabel}>Chon hoc ky:</span>
         <div className={styles.customSelectWrapper} ref={dropdownRef}>
-          <button 
-            className={styles.customSelectBtn} 
+          <button
+            className={styles.customSelectBtn}
             onClick={() => setDropdownOpen(!dropdownOpen)}
           >
-            <span>{selectedSemester === 'all' ? 'Tất cả kỳ học' : selectedSemester}</span>
-            <span className={`${styles.customSelectIcon} ${dropdownOpen ? styles.iconOpen : ''}`}>▼</span>
+            <span>{selectedSemester === 'all' ? 'Tat ca hoc ky' : selectedSemester}</span>
+            <span className={`${styles.customSelectIcon} ${dropdownOpen ? styles.iconOpen : ''}`}>
+              ▼
+            </span>
           </button>
           {dropdownOpen && (
             <div className={styles.customDropdownMenu}>
@@ -199,7 +254,7 @@ export default function Grades() {
                   setDropdownOpen(false);
                 }}
               >
-                Tất cả kỳ học
+                Tat ca hoc ky
               </div>
               {(summary?.semesters || []).map((semester) => (
                 <div
@@ -218,10 +273,8 @@ export default function Grades() {
         </div>
         {semesterData && semesterData.gpa_hoc_ky > 0 && (
           <span className={styles.semesterGpa}>
-            {selectedSemester === 'all' ? 'GPA tích lũy: ' : 'GPA học kỳ: '}
-            <span className={styles.semesterGpaValue}>
-              {semesterData.gpa_hoc_ky?.toFixed(2)}
-            </span>
+            {selectedSemester === 'all' ? 'GPA tich luy: ' : 'GPA hoc ky: '}
+            <span className={styles.semesterGpaValue}>{semesterData.gpa_hoc_ky?.toFixed(2)}</span>
           </span>
         )}
       </div>
@@ -232,20 +285,18 @@ export default function Grades() {
             <thead>
               <tr>
                 <th>STT</th>
-                <th>Mã môn</th>
-                <th>Tên môn học</th>
+                <th>Ma mon</th>
+                <th>Ten mon hoc</th>
                 <th>TC</th>
-                <th>QT</th>
-                <th>GK</th>
-                <th>CK</th>
-                <th>TK (10)</th>
-                <th>TK (4)</th>
-                <th>Xếp loại</th>
-                <th>Trạng thái</th>
+                {scoreColumns.map((column) => (
+                  <th key={column.key}>{column.label}</th>
+                ))}
+                <th>Xep loai</th>
+                <th>Trang thai</th>
               </tr>
             </thead>
             <tbody>
-              {(semesterData?.mon_hoc || []).map((course, index, arr) => {
+              {courses.map((course, index, arr) => {
                 const prev = arr[index - 1];
                 const showHeader = course.hoc_ky_goc && (!prev || prev.hoc_ky_goc !== course.hoc_ky_goc);
 
@@ -253,7 +304,7 @@ export default function Grades() {
                   <React.Fragment key={`${course.ma_mon}-${course.stt}`}>
                     {showHeader && (
                       <tr className={styles.termGroupHeader}>
-                        <td colSpan="11">{course.hoc_ky_goc}</td>
+                        <td colSpan={scoreColumns.length + 6}>{course.hoc_ky_goc}</td>
                       </tr>
                     )}
                     <tr>
@@ -261,11 +312,9 @@ export default function Grades() {
                       <td>{course.ma_mon}</td>
                       <td>{course.ten_mon}</td>
                       <td>{course.tc}</td>
-                      <td>{course.diem_qt ?? '-'}</td>
-                      <td>{course.diem_gk ?? '-'}</td>
-                      <td>{course.diem_ck ?? '-'}</td>
-                      <td>{course.diem_tk_10 ?? '-'}</td>
-                      <td>{course.diem_tk_4 ?? '-'}</td>
+                      {scoreColumns.map((column) => (
+                        <td key={column.key}>{getColumnValue(course, column.key)}</td>
+                      ))}
                       <td className={getGradeClass(course.xep_loai)}>{course.xep_loai}</td>
                       <td>
                         <span className={`${styles.statusBadge} ${getStatusBadge(course.trang_thai)}`}>
@@ -283,7 +332,7 @@ export default function Grades() {
 
       <div className={styles.exportRow}>
         <button className={styles.exportBtn} onClick={handleExportPDF}>
-          📄 Xuất PDF
+          Xuat PDF
         </button>
       </div>
     </div>
