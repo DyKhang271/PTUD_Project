@@ -11,7 +11,7 @@ const PAGE_TITLES = {
   '/curriculum': 'Chương trình khung',
 };
 
-export default function Topbar({ onToggleSidebar, isDesktopCollapsed }) {
+export default function Topbar({ onToggleSidebar, isDesktopCollapsed, isDarkTheme, toggleTheme }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { isParent, logout, user } = useAuth();
@@ -125,6 +125,14 @@ export default function Topbar({ onToggleSidebar, isDesktopCollapsed }) {
 
       <div className={styles.right}>
         {isParent && <span className={styles.parentBadge}>👨‍👩‍👧 Phụ huynh</span>}
+
+        <button 
+          className={styles.themeToggleBtn} 
+          title="Đổi giao diện Sáng/Tối"
+          onClick={toggleTheme}
+        >
+          {isDarkTheme ? '☀️' : '🌙'}
+        </button>
 
         <button 
           className={styles.notifBtn} 

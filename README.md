@@ -1,56 +1,56 @@
 # IUH Student Portal & AI Academic Assistant
 
-Ung dung mo phong cong thong tin sinh vien IUH voi giao dien web, dashboard hoc tap, bang diem, chuong trinh khung, quan tri vien, giang vien va chatbot hoc vu.
+Ứng dụng mô phỏng cổng thông tin sinh viên IUH với giao diện web, dashboard học tập, bảng điểm, chương trình khung, quản trị viên, giảng viên và chatbot học vụ.
 
-## Cong nghe
+## Công nghệ
 
 - Frontend: React, Vite, Axios, CSS Modules
 - Backend: FastAPI
 - Database runtime: PostgreSQL
-- Luu tru hoc vu: JSON payload duoc seed vao PostgreSQL (`JSONB`)
-- Xuat PDF: `jspdf`, `jspdf-autotable`
+- Lưu trữ học vụ: JSON payload được seed vào PostgreSQL (`JSONB`)
+- Xuất PDF: `jspdf`, `jspdf-autotable`
 
-## Cau truc thu muc
+## Cấu trúc thư mục
 
-- `frontend/`: giao dien nguoi dung
-- `backend/`: API FastAPI va logic nghiep vu
-- `database/`: schema PostgreSQL va script lien quan
-- `data_json/`: 2 file JSON sinh vien duoc seed vao database
-- `RAG_docx/`: tai lieu phuc vu chatbot / RAG ve sau
+- `frontend/`: giao diện người dùng
+- `backend/`: API FastAPI và logic nghiệp vụ
+- `database/`: schema PostgreSQL và script liên quan
+- `data_json/`: 2 file JSON sinh viên được seed vào database
+- `RAG_docx/`: tài liệu phục vụ chatbot / RAG về sau
 
-## Cach chay nhanh bang Docker
+## Cách chạy nhanh bằng Docker
 
-Project nay duoc thiet ke de chay bang Docker voi 4 service mac dinh:
+Project này được thiết kế để chạy bằng Docker với 4 service mặc định:
 
 - `postgres`: database runtime
-- `backend`: FastAPI, tu dong seed 2 file JSON vao DB neu DB dang rong
-- `frontend`: Nginx phuc vu build React
-- `ollama`: gateway Ollama cho chatbot AI, co the chay model local hoac cloud model cua Ollama
+- `backend`: FastAPI, tự động seed 2 file JSON vào DB nếu DB đang rỗng
+- `frontend`: Nginx phục vụ build React
+- `ollama`: gateway Ollama cho chatbot AI, có thể chạy model local hoặc cloud model của Ollama
 
-### Khoi dong lan dau
+### Khởi động lần đầu
 
 ```bash
 docker compose up --build
 ```
 
-Truy cap:
+Truy cập:
 
 - Frontend: `http://localhost:8080`
 - Backend API: `http://localhost:8000`
 - PostgreSQL: `localhost:5432`
 - Ollama API: `http://localhost:11434`
 
-Database mac dinh:
+Database mặc định:
 
 - DB name: `student_portal`
 - User: `postgres`
 - Password: `postgres`
 
-### Bat model cho chatbot AI
+### Bật model cho chatbot AI
 
-Mac dinh project da cau hinh chatbot dung model cloud `gemma4:31b-cloud` qua Ollama.
+Mặc định project đã cấu hình chatbot dùng model cloud `gemma4:31b-cloud` qua Ollama.
 
-De cloud model hoat dong trong container `ollama`, ban can dang nhap Ollama ngay trong container de cap public key cho instance do. Lam 1 lan:
+Để cloud model hoạt động trong container `ollama`, bạn cần đăng nhập Ollama ngay trong container để cấp public key cho instance đó. Làm 1 lần:
 
 ```bash
 docker compose exec ollama ollama signin
@@ -62,44 +62,44 @@ Sau khi sign in xong, pull cloud model:
 docker compose exec ollama ollama pull gemma4:31b-cloud
 ```
 
-Sau khi pull xong, chatbot se tu dong dung AI + RAG. Neu chua sign in hoac model cloud chua san sang, chatbot van fallback an toan sang che do khong dung LLM.
+Sau khi pull xong, chatbot sẽ tự động dùng AI + RAG. Nếu chưa sign in hoặc model cloud chưa sẵn sàng, chatbot vẫn fallback an toàn sang chế độ không dùng LLM.
 
-Neu ban muon quay lai model local, chi can doi `OLLAMA_MODEL` trong [docker-compose.yml](/d:/PTUD_Project/docker-compose.yml) ve mot model local nhu `llama3.2:3b`, sau do:
+Nếu bạn muốn quay lại model local, chỉ cần đổi `OLLAMA_MODEL` trong [docker-compose.yml](/d:/PTUD_Project/docker-compose.yml) về một model local như `llama3.2:3b`, sau đó:
 
 ```bash
 docker compose up -d --build backend
 docker compose exec ollama ollama pull llama3.2:3b
 ```
 
-### Du lieu duoc nap vao DB nhu the nao
+### Dữ liệu được nạp vào DB như thế nào
 
-Khi `postgres` la volume moi va chua co du lieu runtime:
+Khi `postgres` là volume mới và chưa có dữ liệu runtime:
 
-1. Backend doc 2 file JSON trong `data_json/`
-2. Backend seed cac payload nay vao bang `student_raw_records`
-3. Metadata runtime nhu account, teacher, config, schedule, notifications duoc luu vao bang `app_runtime_state`
+1. Backend đọc 2 file JSON trong `data_json/`
+2. Backend seed các payload này vào bảng `student_raw_records`
+3. Metadata runtime như account, teacher, config, schedule, notifications được lưu vào bảng `app_runtime_state`
 
-Sau lan seed dau tien:
+Sau lần seed đầu tiên:
 
-- backend khong con dung JSON lam nguon runtime nua
-- moi lan load du lieu se doc tu PostgreSQL
-- JSON chi con vai tro seed ban dau khi DB rong
+- backend không còn dùng JSON làm nguồn runtime nữa
+- mỗi lần load dữ liệu sẽ đọc từ PostgreSQL
+- JSON chỉ còn vai trò seed ban đầu khi DB rỗng
 
-### Chay lai sau khi sua code
+### Chạy lại sau khi sửa code
 
-Neu chi restart container voi code da duoc mount/built lai:
+Nếu chỉ restart container với code đã được mount/built lại:
 
 ```bash
 docker compose up -d
 ```
 
-Neu ban vua sua code backend/frontend va muon build lai image:
+Nếu bạn vừa sửa code backend/frontend và muốn build lại image:
 
 ```bash
 docker compose up --build
 ```
 
-Neu chi muon build lai mot service:
+Nếu chỉ muốn build lại một service:
 
 ```bash
 docker compose build backend
@@ -107,30 +107,30 @@ docker compose build frontend
 docker compose up -d backend frontend
 ```
 
-Neu ban vua doi module chatbot AI hoac config Ollama:
+Nếu bạn vừa đổi module chatbot AI hoặc config Ollama:
 
 ```bash
 docker compose up -d ollama backend frontend
 ```
 
-### Dung project
+### Dừng project
 
 ```bash
 docker compose down
 ```
 
-### Dung va xoa ca database volume
+### Dừng và xoá cả database volume
 
-Lenh nay se xoa du lieu PostgreSQL hien tai. Lan chay sau, backend se seed lai 2 file JSON goc vao database.
+Lệnh này sẽ xoá dữ liệu PostgreSQL hiện tại. Lần chạy sau, backend sẽ seed lại 2 file JSON gốc vào database.
 
 ```bash
 docker compose down -v
 docker compose up --build
 ```
 
-## Chay local khong dung Docker
+## Chạy local không dùng Docker
 
-Neu muon chay tay, ban can tu khoi tao PostgreSQL truoc, sau do export `DATABASE_URL` cho backend.
+Nếu muốn chạy tay, bạn cần tự khởi tạo PostgreSQL trước, sau đó export `DATABASE_URL` cho backend.
 
 Backend:
 
@@ -151,37 +151,37 @@ npm install
 npm run dev
 ```
 
-## Mau CSV nhap diem
+## Mẫu CSV nhập điểm
 
-- Cac cot ho tro: `mssv`, `class_section_code`, `diem_thuong_ky_1`, `diem_thuong_ky_2`, `diem_thuc_hanh_1`, `diem_thuc_hanh_2`, `diem_qt`, `diem_gk`, `diem_ck`
-- Neu co nhap cac cot `diem_thuong_ky_*` hoac `diem_thuc_hanh_*`, he thong se tu tinh `diem_qt`
+- Các cột hỗ trợ: `mssv`, `class_section_code`, `diem_thuong_ky_1`, `diem_thuong_ky_2`, `diem_thuc_hanh_1`, `diem_thuc_hanh_2`, `diem_qt`, `diem_gk`, `diem_ck`
+- Nếu có nhập các cột `diem_thuong_ky_*` hoặc `diem_thuc_hanh_*`, hệ thống sẽ tự tính `diem_qt`
 
-## Tai khoan demo
+## Tài khoản demo
 
-### Sinh vien
+### Sinh viên
 
 1. `23630781` / `23630781`
 2. `23630761` / `23630761`
 
-### Quan tri vien
+### Quản trị viên
 
 1. `admin` / `admin`
 
-### Giang vien
+### Giảng viên
 
 1. `gvungdung` / `gvungdung`
 2. `gvaiml` / `gvaiml`
 
-### Phu huynh
+### Phụ huynh
 
-1. `Tran Minh Khang` - MSSV `23630781` - ngay sinh `04/09/2005` - SDT `0912360781`
-2. `Le Gia Huy` - MSSV `23630761` - ngay sinh `12/03/2005` - SDT `0912360761`
+1. `Trần Minh Khang` - MSSV `23630781` - ngày sinh `04/09/2005` - SĐT `0912360781`
+2. `Lê Gia Huy` - MSSV `23630761` - ngày sinh `12/03/2005` - SĐT `0912360761`
 
-## Ghi chu
+## Ghi chú
 
-- Nguon du lieu runtime chinh hien tai la PostgreSQL, khong con phu thuoc vao `backend/storage/portal_state.json` khi chay bang Docker
-- Hai file trong `data_json/` chi duoc dung de seed mot lan khi DB rong
-- Sau khi seed, frontend va backend doc du lieu runtime tu PostgreSQL
-- Chatbot AI uu tien lay du lieu hoc tap tu PostgreSQL va tai lieu quy che/chuong trinh khung tu `RAG_docx/`
-- Neu dung cloud model cua Ollama, instance `ollama` trong Docker can duoc `ollama signin` truoc khi pull model
-- Neu `ollama` chua chay, chua sign in, hoac chua pull model, chatbot van khong crash va se tra loi bang che do fallback
+- Nguồn dữ liệu runtime chính hiện tại là PostgreSQL, không còn phụ thuộc vào `backend/storage/portal_state.json` khi chạy bằng Docker
+- Hai file trong `data_json/` chỉ được dùng để seed một lần khi DB rỗng
+- Sau khi seed, frontend và backend đọc dữ liệu runtime từ PostgreSQL
+- Chatbot AI ưu tiên lấy dữ liệu học tập từ PostgreSQL và tài liệu quy chế/chương trình khung từ `RAG_docx/`
+- Nếu dùng cloud model của Ollama, instance `ollama` trong Docker cần được `ollama signin` trước khi pull model
+- Nếu `ollama` chưa chạy, chưa sign in, hoặc chưa pull model, chatbot vẫn không crash và sẽ trả lời bằng chế độ fallback

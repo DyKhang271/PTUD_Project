@@ -33,15 +33,18 @@
 }
 
 .sumIconGpa {
-  background: #e8f0fe;
+  background: var(--accent);
+  color: var(--primary);
 }
 
 .sumIconPass {
-  background: #e6f9ed;
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .sumIconFail {
-  background: #fde8ea;
+  background: var(--danger-bg); /* Or warning-bg depending on what is being displayed, we will use danger-bg for fail/HK */
+  color: var(--danger);
 }
 
 .sumValue {
@@ -132,7 +135,7 @@
   font-weight: 600;
   padding: 8px 16px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--bg-card);
   color: var(--text);
   border: 1px solid var(--border);
   outline: none;
@@ -142,7 +145,7 @@
 
 .customSelectBtn:hover {
   border-color: var(--primary);
-  background: rgb(249, 250, 251);
+  background: var(--bg-hover);
 }
 
 .customSelectIcon {
@@ -160,9 +163,9 @@
   top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: #fff;
+  background: var(--bg-card);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-light);
   min-width: 100%;
   white-space: nowrap;
@@ -181,12 +184,12 @@
 }
 
 .customDropdownOption:hover {
-  background: rgb(243, 244, 246);
+  background: var(--bg-hover);
 }
 
 .customDropdownOptionActive {
-  background: rgb(239, 246, 255);
-  color: var(--primary);
+  background: var(--primary);
+  color: #fff;
   font-weight: 600;
 }
 

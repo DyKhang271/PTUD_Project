@@ -109,17 +109,17 @@ export default function Sidebar({ isOpen, onToggle, isDesktopCollapsed }) {
           {!isParent && (
             <>
               <div className={styles.navLabel}>Hỗ trợ</div>
-              <div
-                className={styles.navItem}
+              <NavLink
+                to="/chat"
+                className={`${styles.navItem} ${
+                  location.pathname === '/chat' ? styles.navItemActive : ''
+                }`}
                 onClick={() => {
-                  document.dispatchEvent(new CustomEvent('openChatbot'));
                   if (window.innerWidth <= 768) onToggle();
                 }}
-                role="button"
-                tabIndex={0}
               >
                 <span className={styles.navText}>Tư vấn AI</span>
-              </div>
+              </NavLink>
             </>
           )}
         </nav>

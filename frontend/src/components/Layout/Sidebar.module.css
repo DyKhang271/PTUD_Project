@@ -4,7 +4,7 @@
   left: 0;
   width: var(--sidebar-width);
   height: 100vh;
-  background: linear-gradient(180deg, var(--primary-dark) 0%, var(--primary) 100%);
+  background: var(--sidebar-bg);
   color: #fff;
   display: flex;
   flex-direction: column;

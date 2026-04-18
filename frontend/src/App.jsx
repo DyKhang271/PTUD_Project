@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Layout/Sidebar';
 import Topbar from './components/Layout/Topbar';
 import Chatbot from './components/Chatbot/Chatbot';
+import FloatingChatButton from './components/Chatbot/FloatingChatButton';
 import Login from './pages/Login/Login';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Profile from './pages/Profile/Profile';
@@ -35,6 +36,28 @@ function Layout() {
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const { isParent } = useAuth();
 
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    return localStorage.getItem('theme') === 'dark';
+  });
+
+  useEffect(() => {
+    if (isDarkTheme) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkTheme]);
+
+  const toggleTheme = () => {
+    document.documentElement.classList.add('theme-transition');
+    setIsDarkTheme(!isDarkTheme);
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-transition');
+    }, 400);
+  };
+
   return (
     <div className="layout-wrapper">
       <Sidebar
@@ -46,13 +69,14 @@ function Layout() {
         <Topbar 
           onToggleSidebar={() => setDesktopCollapsed(!desktopCollapsed)} 
           isDesktopCollapsed={desktopCollapsed}
+          isDarkTheme={isDarkTheme}
+          toggleTheme={toggleTheme}
         />
         <main className="main-content-inner">
           <Outlet />
         </main>
       </div>
-      {/* Chatbot only for students */}
-      {!isParent && <Chatbot />}
+      <FloatingChatButton />
     </div>
   );
 }
@@ -106,6 +130,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute />}>
         {isAdmin ? (
@@ -123,9 +148,12 @@ function AppRoutes() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/grades" element={<Grades />} />
-            {/* Curriculum only for students */}
+            {/* Curriculum and Chat only for students */}
             {!isParent && (
-              <Route path="/curriculum" element={<Curriculum />} />
+              <>
+                <Route path="/curriculum" element={<Curriculum />} />
+                <Route path="/chat" element={<Chatbot />} />
+              </>
             )}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
