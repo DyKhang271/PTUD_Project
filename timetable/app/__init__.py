@@ -1,0 +1,2 @@
+"""Attendance & Timetable backend package."""
+
