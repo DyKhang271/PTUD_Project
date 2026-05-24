@@ -6,26 +6,26 @@ export default function CourseSectionsTable({ course }) {
     <div className="table-card">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Lop hoc phan thuc te cua mon da chon</h2>
+          <h2 className="page-title">Lớp học phần thực tế của môn đã chọn</h2>
           <p className="page-subtitle">
-            {course ? `${course.course_code} - ${course.course_name}` : "Chon mot mon o bang ben tren de xem chi tiet lop hoc phan."}
+            {course ? `${course.course_code} - ${course.course_name}` : "Chọn một môn ở bảng bên trên để xem chi tiết lớp học phần."}
           </p>
         </div>
       </div>
 
       {!course ? (
-        <EmptyState message="Hay chon mot mon trong bang ke hoach de xem lop hoc phan thuc te." />
+        <EmptyState message="Hãy chọn một môn trong bảng kế hoạch để xem lớp học phần thực tế." />
       ) : course.sections?.length ? (
         <table className="interactive-table">
           <thead>
             <tr>
-              <th>Ma lop HP</th>
-              <th>Lop danh nghia</th>
-              <th>Si so</th>
-              <th>Giang vien</th>
-              <th>Lich hoc</th>
-              <th>Lich thi</th>
-              <th>Trang thai</th>
+              <th>Mã lớp HP</th>
+              <th>Lớp danh nghĩa</th>
+              <th>Sĩ số</th>
+              <th>Giảng viên</th>
+              <th>Lịch học</th>
+              <th>Lịch thi</th>
+              <th>Trạng thái</th>
             </tr>
           </thead>
           <tbody>
@@ -45,7 +45,7 @@ export default function CourseSectionsTable({ course }) {
           </tbody>
         </table>
       ) : (
-        <EmptyState message="Mon nay chua co lop hoc phan thuc te trong hoc ky da chon." />
+        <EmptyState message="Môn này chưa có lớp học phần thực tế trong học kỳ đã chọn." />
       )}
     </div>
   );

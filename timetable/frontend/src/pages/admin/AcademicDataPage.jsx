@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
+import CustomSelect from "../../components/CustomSelect";
 import {
   fetchAcademicImportBatches,
   fetchAcademicImportDebugSummary,
@@ -97,6 +98,21 @@ export default function AcademicDataPage() {
   );
 
   const cohortOptions = useMemo(() => selectedProgram?.cohorts || [], [selectedProgram]);
+
+  const termSelectOptions = useMemo(() => [
+    { value: "", label: "Tìm và chọn học kỳ" },
+    ...options.terms.map((t) => ({ value: t.value, label: t.label }))
+  ], [options.terms]);
+
+  const programSelectOptions = useMemo(() => [
+    { value: "", label: "Tìm và chọn ngành/chương trình" },
+    ...options.programs.map((p) => ({ value: p.name, label: p.name }))
+  ], [options.programs]);
+
+  const cohortSelectOptions = useMemo(() => [
+    { value: "", label: "Tất cả khóa tuyển" },
+    ...cohortOptions.map((c) => ({ value: String(c), label: `Khóa ${c}` }))
+  ], [cohortOptions]);
 
   useEffect(() => {
     if (!form.cohort) {
@@ -225,13 +241,13 @@ export default function AcademicDataPage() {
   const sectionDiffRows = latestSections.map((section) => {
     const issues = [];
     if (!section.teacher_external_id) {
-      issues.push("Thieu giang vien");
+      issues.push("Thiếu giảng viên");
     }
     if (duplicateSectionCodes.has(section.section_code)) {
-      issues.push("Trung section");
+      issues.push("Trùng lớp học phần");
     }
     if ((section.student_count || 0) === 0) {
-      issues.push("Chua co sinh vien");
+      issues.push("Chưa có sinh viên");
     }
     return {
       ...section,
@@ -261,54 +277,33 @@ export default function AcademicDataPage() {
         <form className="inline-form" onSubmit={handleImport}>
           <label className="field-group">
             <span>Học kỳ</span>
-            <input
-              list="academic-data-term-options"
+            <CustomSelect
               value={form.term_code}
-              onChange={(event) => setForm((current) => ({ ...current, term_code: event.target.value }))}
+              onChange={(val) => setForm((current) => ({ ...current, term_code: val }))}
+              options={termSelectOptions}
               placeholder="Tìm và chọn học kỳ"
-              required
             />
-            <datalist id="academic-data-term-options">
-              {options.terms.map((term) => (
-                <option key={term.value} value={term.value}>
-                  {term.label}
-                </option>
-              ))}
-            </datalist>
-            {!form.term_code ? <small className="helper-text">Chọn học kỳ có dữ liệu để bắt đầu import.</small> : null}
           </label>
 
           <label className="field-group">
             <span>Ngành</span>
-            <input
-              list="academic-data-program-options"
+            <CustomSelect
               value={form.program_name}
-              onChange={(event) => setForm((current) => ({ ...current, program_name: event.target.value }))}
+              onChange={(val) => setForm((current) => ({ ...current, program_name: val }))}
+              options={programSelectOptions}
               placeholder="Tìm và chọn ngành/chương trình"
-              required
             />
-            <datalist id="academic-data-program-options">
-              {options.programs.map((program) => (
-                <option key={program.name} value={program.name} />
-              ))}
-            </datalist>
           </label>
 
           <label className="field-group">
             <span>Khóa tuyển</span>
-            <input
-              list="academic-data-cohort-options"
+            <CustomSelect
               value={form.cohort}
-              onChange={(event) => setForm((current) => ({ ...current, cohort: event.target.value }))}
+              onChange={(val) => setForm((current) => ({ ...current, cohort: val }))}
+              options={cohortSelectOptions}
               placeholder={form.program_name ? "Ví dụ: 2023" : "Chọn ngành trước"}
               disabled={!form.program_name}
             />
-            <datalist id="academic-data-cohort-options">
-              {cohortOptions.map((cohort) => (
-                <option key={cohort} value={cohort} />
-              ))}
-            </datalist>
-            <small className="helper-text">Để trống để import tất cả khóa tuyển trong ngành/chương trình này.</small>
           </label>
 
           <button className="primary-button" type="submit" disabled={loading || !form.term_code || !form.program_name}>
@@ -316,41 +311,71 @@ export default function AcademicDataPage() {
           </button>
         </form>
 
+        {/* Chú thích helper text được đưa xuống dưới giúp giao diện cân đối */}
+        <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", marginTop: "-4px", fontSize: "0.82rem", color: "var(--text-secondary)" }}>
+          {!form.term_code && (
+            <span>💡 <strong>Học kỳ:</strong> Chọn học kỳ có dữ liệu để bắt đầu import.</span>
+          )}
+          <span>💡 <strong>Khóa tuyển:</strong> Để trống để import tất cả khóa tuyển trong ngành.</span>
+        </div>
+
         <div className="section-stack">
-          <button className="link-button" type="button" onClick={() => setShowAdvanced((current) => !current)}>
-            {showAdvanced ? "Ẩn tùy chọn nâng cao" : "Ẩn/hiện tùy chọn nâng cao"}
-          </button>
+          <div style={{ display: "flex", justifyContent: "flex-start", marginTop: "4px" }}>
+            <button className="link-button" type="button" onClick={() => setShowAdvanced((current) => !current)} style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              {showAdvanced ? (
+                <>
+                  <span>Ẩn tùy chọn nâng cao</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                </>
+              ) : (
+                <>
+                  <span>Ẩn/hiện tùy chọn nâng cao</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </>
+              )}
+            </button>
+          </div>
           {showAdvanced ? (
-            <div className="inline-form">
-              <label className="field-group">
-                <span>Học kỳ CTĐT tham chiếu</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.curriculum_semester}
-                  onChange={(event) => setForm((current) => ({ ...current, curriculum_semester: event.target.value }))}
-                  placeholder="Ví dụ: 4"
-                />
-                <small className="helper-text">
-                  Dùng để đối chiếu chương trình đào tạo khi import dữ liệu học vụ.
-                </small>
-              </label>
-              <label className="field-group">
-                <span>Chế độ kiểm tra chặt</span>
-                <label className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={form.strict_curriculum_match}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, strict_curriculum_match: event.target.checked }))
-                    }
-                  />
-                  <span>Chỉ import môn khớp đúng học kỳ CTĐT</span>
-                </label>
-                <small className="helper-text">
-                  Nếu bật, hệ thống chỉ import các môn khớp đúng với học kỳ chương trình tham chiếu.
-                </small>
-              </label>
+            <div style={{ background: "var(--bg-hover)", padding: "20px", borderRadius: "var(--radius-lg)", border: "1px dashed var(--border)", marginTop: "4px" }}>
+              <div className="advanced-options-grid">
+                <div className="setting-card">
+                  <div className="setting-info">
+                    <span className="setting-title">Học kỳ CTĐT tham chiếu</span>
+                    <span className="setting-description">
+                      Dùng để đối chiếu chương trình đào tạo khi import dữ liệu học vụ từ Student Portal.
+                    </span>
+                  </div>
+                  <div className="setting-action">
+                    <input
+                      type="number"
+                      min="1"
+                      value={form.curriculum_semester || ""}
+                      onChange={(event) => setForm((current) => ({ ...current, curriculum_semester: event.target.value }))}
+                      placeholder="Ví dụ: 4"
+                      className="setting-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="setting-card">
+                  <div className="setting-info">
+                    <span className="setting-title">Chế độ kiểm tra chặt</span>
+                    <span className="setting-description">
+                      Nếu bật, hệ thống chỉ import các môn khớp đúng với học kỳ chương trình tham chiếu.
+                    </span>
+                  </div>
+                  <label className="switch-control">
+                    <input
+                      type="checkbox"
+                      checked={form.strict_curriculum_match}
+                      onChange={(event) =>
+                        setForm((current) => ({ ...current, strict_curriculum_match: event.target.checked }))
+                      }
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
+                </div>
+              </div>
             </div>
           ) : null}
         </div>
@@ -528,7 +553,7 @@ export default function AcademicDataPage() {
               {comparison.duplicate_sections.map((item) => (
                 <tr key={item.section_code}>
                   <td>{item.section_code}</td>
-                  <td>Trung section trong he thong</td>
+                  <td>Trùng lớp học phần trong hệ thống</td>
                   <td>{item.count}</td>
                 </tr>
               ))}
@@ -594,32 +619,32 @@ export default function AcademicDataPage() {
               <div className="cards-grid" style={{ marginBottom: "20px" }}>
                 <div className="stat-card">
                   <h3>{debug.matched_students_by_program}</h3>
-                  <p>Sinh vien khop nganh</p>
+                  <p>Sinh viên khớp ngành</p>
                 </div>
                 <div className="stat-card">
                   <h3>{debug.matched_students_by_cohort}</h3>
-                  <p>Sinh vien khop khoa</p>
+                  <p>Sinh viên khớp khóa</p>
                 </div>
                 <div className="stat-card">
                   <h3>{debug.transcript_courses_in_term}</h3>
-                  <p>Mon trong hoc ky</p>
+                  <p>Môn trong học kỳ</p>
                 </div>
                 <div className="stat-card">
                   <h3>{debug.imported_courses_count}</h3>
-                  <p>Mon da import</p>
+                  <p>Môn đã import</p>
                 </div>
               </div>
               <div className="section-stack" style={{ gap: "16px" }}>
                 <div>
-                  <strong>Mon trung CTDT tham chieu</strong>
+                  <strong>Môn trùng CTĐT tham chiếu</strong>
                   <p style={{ color: "var(--text-secondary)", marginTop: "4px" }}>{debug.overlap_course_codes?.length ? debug.overlap_course_codes.join("; ") : "--"}</p>
                 </div>
                 <div>
-                  <strong>Mon co trong transcript nhung khong thuoc ky tham chieu</strong>
+                  <strong>Môn có trong điểm học tập nhưng không thuộc kỳ tham chiếu</strong>
                   <p style={{ color: "var(--text-secondary)", marginTop: "4px" }}>{debug.transcript_only_course_codes?.length ? debug.transcript_only_course_codes.join("; ") : "--"}</p>
                 </div>
                 <div>
-                  <strong>Mon thuoc ky tham chieu nhung khong co trong transcript</strong>
+                  <strong>Môn thuộc kỳ tham chiếu nhưng không có trong điểm học tập</strong>
                   <p style={{ color: "var(--text-secondary)", marginTop: "4px" }}>{debug.curriculum_only_course_codes?.length ? debug.curriculum_only_course_codes.join("; ") : "--"}</p>
                 </div>
               </div>

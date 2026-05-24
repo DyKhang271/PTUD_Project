@@ -22,13 +22,13 @@ const adminLinks = [
 ];
 
 export function StudentLayout() {
-  return <AppShell title="Khong gian sinh vien" links={studentLinks} />;
+  return <AppShell title="Không gian sinh viên" links={studentLinks} />;
 }
 
 export function TeacherLayout() {
-  return <AppShell title="Khong gian giang vien" links={teacherLinks} />;
+  return <AppShell title="Không gian giảng viên" links={teacherLinks} />;
 }
 
 export function AdminLayout() {
-  return <AppShell title="Quan tri timetable" links={adminLinks} />;
+  return <AppShell title="Quản trị thời khóa biểu" links={adminLinks} />;
 }

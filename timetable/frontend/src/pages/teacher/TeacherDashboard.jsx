@@ -71,7 +71,7 @@ export default function TeacherDashboard() {
           <div className="button-row">
             {state.sections.slice(0, 6).map((section) => (
               <Link key={section.id} className="secondary-button" to={`/teacher/sections/${section.id}/attendance`}>
-                Điểm danh {section.section_code}
+                Điểm danh {section.section_code} - {section.course_name}
               </Link>
             ))}
           </div>

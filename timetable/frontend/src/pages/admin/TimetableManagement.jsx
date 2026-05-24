@@ -1,7 +1,8 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import StatusBadge from "../../components/StatusBadge";
+import CustomSelect from "../../components/CustomSelect";
 import {
   cleanupInvalidTimetableEntries,
   createExam,
@@ -455,6 +456,33 @@ export default function TimetableManagement() {
   const activeTimetableTerm = termsById.get(timetableForm.term_id);
   const activeExamTerm = termsById.get(examForm.term_id);
 
+  const termSelectOptions = useMemo(() => [
+    { value: "", label: "Chọn học kỳ" },
+    ...state.terms.map((t) => ({ value: t.id, label: t.term_code }))
+  ], [state.terms]);
+
+  const facultySelectOptions = useMemo(() => [
+    { value: "", label: "Chọn khoa" },
+    ...facultyOptions.map((f) => ({ value: f, label: f }))
+  ], [facultyOptions]);
+
+  const programSelectOptions = useMemo(() => [
+    { value: "", label: "Chọn ngành / chương trình" },
+    ...programOptions.map((p) => ({ value: p, label: p }))
+  ], [programOptions]);
+
+  const semesterSelectOptions = [
+    { value: "", label: "Tất cả" }
+  ];
+
+  const courseSelectOptions = useMemo(() => [
+    { value: "", label: "Tất cả môn học" },
+    ...courseOptions.map((subject) => ({
+      value: subject.course_id,
+      label: `${subject.course_name} (${subject.course_code})`
+    }))
+  ], [courseOptions]);
+
   if (state.loading && !state.terms.length) return <LoadingState label="Đang tải module lịch học..." />;
   if (state.error && !state.terms.length) return <ErrorState message={state.error} onRetry={() => loadView(filters)} />;
 
@@ -473,11 +501,11 @@ export default function TimetableManagement() {
         <div className="filter-grid">
           <label className="field-group">
             <span>Học kỳ</span>
-            <select
+            <CustomSelect
               value={filters.term_id}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  term_id: event.target.value,
+                  term_id: val,
                   faculty: "",
                   program: "",
                   curriculum_semester: "",
@@ -485,86 +513,66 @@ export default function TimetableManagement() {
                   q: "",
                 })
               }
-            >
-              <option value="">Chọn học kỳ</option>
-              {state.terms.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.term_code}
-                </option>
-              ))}
-            </select>
+              options={termSelectOptions}
+              placeholder="Chọn học kỳ"
+            />
           </label>
 
           <label className="field-group">
             <span>Khoa</span>
-            <select
+            <CustomSelect
               value={filters.faculty}
               disabled={!filters.term_id || isUnclassifiedMode}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  faculty: event.target.value,
+                  faculty: val,
                   program: "",
                   curriculum_semester: "",
                   course_id: "",
                 })
               }
-            >
-              <option value="">Chọn khoa</option>
-              {facultyOptions.map((faculty) => (
-                <option key={faculty} value={faculty}>
-                  {faculty}
-                </option>
-              ))}
-            </select>
+              options={facultySelectOptions}
+              placeholder="Chọn khoa"
+            />
           </label>
 
           <label className="field-group">
             <span>Ngành / Chương trình</span>
-            <select
+            <CustomSelect
               value={filters.program}
               disabled={!filters.faculty || isUnclassifiedMode}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  program: event.target.value,
+                  program: val,
                   curriculum_semester: "",
                   course_id: "",
                 })
               }
-            >
-              <option value="">Chọn ngành / chương trình</option>
-              {programOptions.map((program) => (
-                <option key={program} value={program}>
-                  {program}
-                </option>
-              ))}
-            </select>
+              options={programSelectOptions}
+              placeholder="Chọn ngành / chương trình"
+            />
           </label>
 
           <label className="field-group">
             <span>Học kỳ CT</span>
-            <select
+            <CustomSelect
               value={filters.curriculum_semester}
               disabled={!contextReady || isUnclassifiedMode}
-              onChange={(event) => updateFilters({ curriculum_semester: event.target.value })}
-            >
-              <option value="">Tất cả</option>
-            </select>
+              onChange={(val) => updateFilters({ curriculum_semester: val })}
+              options={semesterSelectOptions}
+              placeholder="Tất cả"
+            />
           </label>
 
           <label className="field-group">
             <span>Môn học</span>
-            <select
+            <CustomSelect
               value={filters.course_id}
               disabled={!contextReady || isUnclassifiedMode}
-              onChange={(event) => updateFilters({ course_id: event.target.value })}
-            >
-              <option value="">Tất cả môn học</option>
-              {courseOptions.map((subject) => (
-                <option key={`${subject.term_id || "termless"}-${subject.course_id}`} value={subject.course_id}>
-                  {subject.course_name} ({subject.course_code})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => updateFilters({ course_id: val })}
+              options={courseSelectOptions}
+              placeholder="Tất cả môn học"
+            />
           </label>
 
           <label className="field-group">
@@ -801,53 +809,52 @@ export default function TimetableManagement() {
               <div className="inline-form">
                 <label className="field-group">
                   <span>Môn học</span>
-                  <select value={timetableForm.course_id} onChange={(event) => setTimetableForm((prev) => ({ ...prev, course_id: event.target.value, section_id: "" }))} required>
-                    <option value="">Chọn môn học</option>
-                    {courseOptions.map((subject) => (
-                      <option key={`${subject.term_id || "termless"}-${subject.course_id}`} value={subject.course_id}>
-                        {subject.course_name} ({subject.course_code})
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={timetableForm.course_id}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, course_id: val, section_id: "" }))}
+                    options={[{ value: "", label: "Chọn môn học" }, ...courseOptions.map((s) => ({ value: s.course_id, label: `${s.course_name} (${s.course_code})` }))]}
+                    placeholder="Chọn môn học"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Lớp học phần</span>
-                  <select value={timetableForm.section_id} onChange={(event) => setTimetableForm((prev) => ({ ...prev, section_id: event.target.value }))} required>
-                    <option value="">Chọn lớp học phần</option>
-                    {formSections.map((section) => (
-                      <option key={section.id} value={section.id}>
-                        {section.section_code} - {section.course_name}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={timetableForm.section_id}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, section_id: val }))}
+                    options={[{ value: "", label: "Chọn lớp học phần" }, ...formSections.map((sec) => ({ value: sec.id, label: `${sec.section_code} - ${sec.course_name}` }))]}
+                    placeholder="Chọn lớp học phần"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Thứ</span>
-                  <select value={timetableForm.day_of_week} onChange={(event) => setTimetableForm((prev) => ({ ...prev, day_of_week: event.target.value }))}>
-                    {DAY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={timetableForm.day_of_week}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, day_of_week: val }))}
+                    options={DAY_OPTIONS}
+                    placeholder="Chọn thứ"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Trạng thái</span>
-                  <select value={timetableForm.status} onChange={(event) => setTimetableForm((prev) => ({ ...prev, status: event.target.value }))}>
-                    <option value="published">Published</option>
-                    <option value="draft">Draft</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <CustomSelect
+                    value={timetableForm.status}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, status: val }))}
+                    options={[
+                      { value: "published", label: "Đã công bố" },
+                      { value: "draft", label: "Bản nháp" },
+                      { value: "cancelled", label: "Đã hủy" },
+                    ]}
+                    placeholder="Chọn trạng thái"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Loại buổi học</span>
-                  <select value={timetableForm.session_type} onChange={(event) => setTimetableForm((prev) => ({ ...prev, session_type: event.target.value }))}>
-                    {SESSION_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={timetableForm.session_type}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, session_type: val }))}
+                    options={SESSION_TYPE_OPTIONS}
+                    placeholder="Chọn loại buổi học"
+                  />
                 </label>
               </div>
 
@@ -916,25 +923,21 @@ export default function TimetableManagement() {
               <div className="inline-form">
                 <label className="field-group">
                   <span>Môn học</span>
-                  <select value={examForm.course_id} onChange={(event) => setExamForm((prev) => ({ ...prev, course_id: event.target.value, section_id: "" }))} required>
-                    <option value="">Chọn môn học</option>
-                    {courseOptions.map((subject) => (
-                      <option key={`${subject.term_id || "termless"}-${subject.course_id}`} value={subject.course_id}>
-                        {subject.course_name} ({subject.course_code})
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={examForm.course_id}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, course_id: val, section_id: "" }))}
+                    options={[{ value: "", label: "Chọn môn học" }, ...courseOptions.map((s) => ({ value: s.course_id, label: `${s.course_name} (${s.course_code})` }))]}
+                    placeholder="Chọn môn học"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Lớp học phần</span>
-                  <select value={examForm.section_id} onChange={(event) => setExamForm((prev) => ({ ...prev, section_id: event.target.value }))} required>
-                    <option value="">Chọn lớp học phần</option>
-                    {formSections.map((section) => (
-                      <option key={section.id} value={section.id}>
-                        {section.section_code} - {section.course_name}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={examForm.section_id}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, section_id: val }))}
+                    options={[{ value: "", label: "Chọn lớp học phần" }, ...formSections.map((sec) => ({ value: sec.id, label: `${sec.section_code} - ${sec.course_name}` }))]}
+                    placeholder="Chọn lớp học phần"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Ngày thi</span>
@@ -942,11 +945,16 @@ export default function TimetableManagement() {
                 </label>
                 <label className="field-group">
                   <span>Trạng thái</span>
-                  <select value={examForm.status} onChange={(event) => setExamForm((prev) => ({ ...prev, status: event.target.value }))}>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="draft">Draft</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <CustomSelect
+                    value={examForm.status}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, status: val }))}
+                    options={[
+                      { value: "scheduled", label: "Đã lên lịch" },
+                      { value: "draft", label: "Bản nháp" },
+                      { value: "cancelled", label: "Đã hủy" },
+                    ]}
+                    placeholder="Chọn trạng thái"
+                  />
                 </label>
               </div>
 
@@ -972,13 +980,12 @@ export default function TimetableManagement() {
               <div className="inline-form">
                 <label className="field-group">
                   <span>Hình thức thi</span>
-                  <select value={examForm.exam_type} onChange={(event) => setExamForm((prev) => ({ ...prev, exam_type: event.target.value }))} required>
-                    {EXAM_TYPE_OPTIONS.map((option) => (
-                      <option key={option.label} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={examForm.exam_type}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, exam_type: val }))}
+                    options={EXAM_TYPE_OPTIONS}
+                    placeholder="Chọn hình thức thi"
+                  />
                 </label>
               </div>
 

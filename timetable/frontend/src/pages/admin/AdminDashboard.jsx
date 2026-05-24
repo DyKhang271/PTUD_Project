@@ -32,7 +32,7 @@ export default function AdminDashboard() {
     } catch (err) {
       setState({
         loading: false,
-        error: err?.response?.data?.detail || "Khong tai duoc dashboard admin.",
+        error: err?.response?.data?.detail || "Không tải được bảng điều khiển quản trị.",
         dashboard: null,
         terms: [],
         sections: [],
@@ -64,55 +64,55 @@ export default function AdminDashboard() {
     [state.batches],
   );
 
-  if (state.loading) return <LoadingState label="Dang tai dashboard admin..." />;
+  if (state.loading) return <LoadingState label="Đang tải bảng điều khiển quản trị..." />;
   if (state.error) return <ErrorState message={state.error} onRetry={load} />;
-  if (!state.dashboard) return <EmptyState message="Chua co du lieu thong ke." />;
+  if (!state.dashboard) return <EmptyState message="Chưa có dữ liệu thống kê." />;
 
   return (
     <div className="section-stack">
       <div className="page-header">
-        <h2 className="page-title">Dashboard quan tri</h2>
-        <p className="page-subtitle">Tong quan suc khoe du lieu hoc vu, van hanh scheduling va canh bao diem danh.</p>
+        <h2 className="page-title">Bảng điều khiển quản trị</h2>
+        <p className="page-subtitle">Tổng quan sức khỏe dữ liệu học vụ, vận hành xếp lịch và cảnh báo điểm danh.</p>
       </div>
 
       <div className="cards-grid">
         <div className="panel metric-card">
           <h3>{activeTerm?.term_code || "--"}</h3>
-          <p>Hoc ky hien hanh</p>
+          <p>Học kỳ hiện hành</p>
         </div>
         <div className="panel metric-card">
           <h3>{state.dashboard.total_sections}</h3>
-          <p>Tong lop hoc phan</p>
+          <p>Tổng lớp học phần</p>
         </div>
         <div className="panel metric-card">
           <h3>{totalStudents}</h3>
-          <p>Tong sinh vien lien ket</p>
+          <p>Tổng sinh viên liên kết</p>
         </div>
         <div className="panel metric-card">
           <h3>{totalTeachers}</h3>
-          <p>Tong giang vien</p>
+          <p>Tổng giảng viên</p>
         </div>
         <div className="panel metric-card">
           <h3>{state.dashboard.average_attendance_percent}%</h3>
-          <p>Ty le diem danh trung binh</p>
+          <p>Tỷ lệ điểm danh trung bình</p>
         </div>
         <div className="panel metric-card">
           <h3>{pendingSyncWarnings}</h3>
-          <p>Canh bao can doi soat</p>
+          <p>Cảnh báo cần đối soát</p>
         </div>
       </div>
 
       <div className="panel section-stack">
-        <h3 className="page-title">Quick actions</h3>
+        <h3 className="page-title">Thao tác nhanh (Quick actions)</h3>
         <div className="button-row">
           <Link className="primary-button" to="/admin/academic-data">
-            Import du lieu hoc vu
+            Nhập dữ liệu học vụ
           </Link>
           <Link className="secondary-button" to="/admin/scheduling">
-            Quan ly scheduling
+            Quản lý lịch học & thi
           </Link>
           <Link className="secondary-button" to="/admin/attendance">
-            Xem canh bao diem danh
+            Xem cảnh báo điểm danh
           </Link>
         </div>
       </div>

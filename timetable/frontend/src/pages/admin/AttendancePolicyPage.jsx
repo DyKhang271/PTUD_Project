@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import CustomSelect from "../../components/CustomSelect";
 
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import {
@@ -36,7 +37,7 @@ export default function AttendancePolicyPage() {
     } catch (err) {
       setState({
         loading: false,
-        error: err?.response?.data?.detail || "Khong tai duoc module diem danh.",
+        error: err?.response?.data?.detail || "Không tải được dữ liệu chính sách điểm danh.",
         items: [],
         dashboard: null,
         bySection: [],
@@ -73,15 +74,15 @@ export default function AttendancePolicyPage() {
     try {
       if (form.id) {
         await updatePolicy(form.id, payload);
-        setFeedback("Da cap nhat policy diem danh.");
+        setFeedback("Đã cập nhật chính sách điểm danh.");
       } else {
         await createPolicy(payload);
-        setFeedback("Da tao policy diem danh.");
+        setFeedback("Đã tạo chính sách điểm danh.");
       }
       setForm(initialForm);
       await load();
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "Khong the luu policy diem danh.");
+      setFeedback(err?.response?.data?.detail || "Không thể lưu chính sách điểm danh.");
     }
   }
 
@@ -94,57 +95,62 @@ export default function AttendancePolicyPage() {
       }
       await load();
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "Khong the xoa policy diem danh.");
+      setFeedback(err?.response?.data?.detail || "Không thể xóa chính sách điểm danh.");
     }
   }
 
-  if (state.loading) return <LoadingState label="Dang tai module diem danh..." />;
+  if (state.loading) return <LoadingState label="Đang tải chính sách điểm danh..." />;
   if (state.error) return <ErrorState message={state.error} onRetry={load} />;
 
   return (
     <div className="section-stack">
       <div className="page-header">
-        <h2 className="page-title">Quan ly diem danh</h2>
+        <h2 className="page-title">Quản lý điểm danh</h2>
         <p className="page-subtitle">
-          Theo doi tong quan diem danh, canh bao lop co ty le thap va cau hinh policy theo pham vi.
+          Theo dõi tổng quan điểm danh, cảnh báo lớp có tỷ lệ thấp và cấu hình chính sách theo phạm vi.
         </p>
       </div>
 
       <div className="cards-grid">
         <div className="panel metric-card">
           <h3>{state.dashboard?.total_sessions ?? 0}</h3>
-          <p>Tong phien diem danh</p>
+          <p>Tổng phiên điểm danh</p>
         </div>
         <div className="panel metric-card">
           <h3>{state.dashboard?.average_attendance_percent ?? 0}%</h3>
-          <p>Ty le tham gia trung binh</p>
+          <p>Tỷ lệ tham gia trung bình</p>
         </div>
         <div className="panel metric-card">
           <h3>{state.dashboard?.late_count ?? 0}</h3>
-          <p>Luot di muon</p>
+          <p>Lượt đi muộn</p>
         </div>
         <div className="panel metric-card">
           <h3>{state.bySection.filter((item) => item.attendance_percent < 80).length}</h3>
-          <p>Canh bao ty le thap</p>
+          <p>Cảnh báo tỷ lệ thấp</p>
         </div>
       </div>
 
       <form className="panel inline-form" onSubmit={handleSubmit}>
         <label className="field-group">
-          <span>Scope type</span>
-          <select value={form.scope_type} onChange={(event) => setForm((prev) => ({ ...prev, scope_type: event.target.value }))}>
-            <option value="global">global</option>
-            <option value="faculty">faculty</option>
-            <option value="course">course</option>
-            <option value="section">section</option>
-          </select>
+          <span>Phạm vi áp dụng (Scope)</span>
+          <CustomSelect
+            value={form.scope_type}
+            onChange={(val) => setForm((prev) => ({ ...prev, scope_type: val }))}
+            options={[
+              { value: "global", label: "Toàn trường (global)" },
+              { value: "faculty", label: "Khoa (faculty)" },
+              { value: "course", label: "Môn học (course)" },
+              { value: "section", label: "Lớp học phần (section)" },
+            ]}
+            placeholder="Chọn phạm vi"
+          />
         </label>
         <label className="field-group">
-          <span>Scope id</span>
-          <input value={form.scope_id} onChange={(event) => setForm((prev) => ({ ...prev, scope_id: event.target.value }))} />
+          <span>Mã đối tượng (Scope ID)</span>
+          <input value={form.scope_id} onChange={(event) => setForm((prev) => ({ ...prev, scope_id: event.target.value }))} placeholder="Ví dụ: công nghệ thông tin hoặc mã môn" />
         </label>
         <label className="field-group">
-          <span>Allow late</span>
+          <span>Cho phép đi muộn tối đa (phút)</span>
           <input
             type="number"
             value={form.allow_late_minutes}
@@ -152,7 +158,7 @@ export default function AttendancePolicyPage() {
           />
         </label>
         <label className="field-group">
-          <span>Warning %</span>
+          <span>Ngưỡng cảnh báo chuyên cần (%)</span>
           <input
             type="number"
             value={form.warning_threshold_percent}
@@ -160,11 +166,11 @@ export default function AttendancePolicyPage() {
           />
         </label>
         <button className="primary-button" type="submit">
-          {form.id ? "Cap nhat policy" : "Tao policy"}
+          {form.id ? "Cập nhật chính sách" : "Tạo chính sách"}
         </button>
         {form.id ? (
           <button className="secondary-button" type="button" onClick={() => setForm(initialForm)}>
-            Huy sua
+            Hủy sửa
           </button>
         ) : null}
       </form>
@@ -173,53 +179,61 @@ export default function AttendancePolicyPage() {
 
       <div className="two-column-grid">
         <div className="table-card">
-          <h3 className="page-title">Danh sach policy</h3>
+          <h3 className="page-title">Danh sách chính sách</h3>
           {state.items.length ? (
             <table>
               <thead>
                 <tr>
-                  <th>Scope</th>
-                  <th>Scope ID</th>
-                  <th>Muon toi da</th>
-                  <th>Nguong canh bao</th>
-                  <th>Thao tac</th>
+                  <th>Phạm vi</th>
+                  <th>Mã đối tượng</th>
+                  <th>Muộn tối đa</th>
+                  <th>Ngưỡng cảnh báo</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {state.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.scope_type}</td>
-                    <td>{item.scope_id || "--"}</td>
-                    <td>{item.allow_late_minutes}</td>
-                    <td>{item.warning_threshold_percent}%</td>
-                    <td className="table-actions">
-                      <button className="secondary-button" type="button" onClick={() => beginEdit(item)}>
-                        Sua
-                      </button>
-                      <button className="danger-button" type="button" onClick={() => handleDelete(item.id)}>
-                        Xoa
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {state.items.map((item) => {
+                  const scopeLabels = {
+                    global: "Toàn trường",
+                    faculty: "Khoa",
+                    course: "Môn học",
+                    section: "Lớp học phần",
+                  };
+                  return (
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: 600 }}>{scopeLabels[item.scope_type] || item.scope_type}</td>
+                      <td>{item.scope_id || "--"}</td>
+                      <td>{item.allow_late_minutes} phút</td>
+                      <td>{item.warning_threshold_percent}%</td>
+                      <td className="table-actions">
+                        <button className="secondary-button" type="button" onClick={() => beginEdit(item)}>
+                          Sửa
+                        </button>
+                        <button className="danger-button" type="button" onClick={() => handleDelete(item.id)}>
+                          Xóa
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           ) : (
-            <EmptyState message="Chua co policy diem danh." />
+            <EmptyState message="Chưa có chính sách điểm danh nào." />
           )}
         </div>
 
         <div className="table-card">
-          <h3 className="page-title">Canh bao theo lop hoc phan</h3>
+          <h3 className="page-title">Cảnh báo theo lớp học phần</h3>
           {state.bySection.length ? (
             <table>
               <thead>
                 <tr>
-                  <th>Section</th>
-                  <th>Tong phien</th>
-                  <th>Absent</th>
-                  <th>Late</th>
-                  <th>Ty le tham gia</th>
+                  <th>Lớp học phần</th>
+                  <th>Tổng phiên</th>
+                  <th>Vắng</th>
+                  <th>Trễ</th>
+                  <th>Tỷ lệ đi học</th>
                 </tr>
               </thead>
               <tbody>
@@ -235,7 +249,7 @@ export default function AttendancePolicyPage() {
               </tbody>
             </table>
           ) : (
-            <EmptyState message="Chua co du lieu giam sat diem danh theo lop." />
+            <EmptyState message="Chưa có dữ liệu giám sát điểm danh theo lớp học phần." />
           )}
         </div>
       </div>

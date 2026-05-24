@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import StatusBadge from "../../components/StatusBadge";
+import CustomSelect from "../../components/CustomSelect";
 import { fetchAttendanceReport, fetchAttendanceSummary } from "../../services/teacherApi";
 
 export default function AttendanceReportPage() {
@@ -32,6 +33,12 @@ export default function AttendanceReportPage() {
     });
   }, [state.summary, filters]);
 
+  const warningStatusOptions = [
+    { value: "all", label: "Tất cả" },
+    { value: "warning", label: "Cảnh báo" },
+    { value: "ok", label: "Ổn định" }
+  ];
+
   if (state.loading) return <LoadingState label="Đang tải báo cáo điểm danh..." />;
   if (state.error) return <ErrorState message={state.error} onRetry={load} />;
   if (!state.report) return <EmptyState message="Chưa có báo cáo." />;
@@ -58,11 +65,12 @@ export default function AttendanceReportPage() {
         </label>
         <label className="field-group">
           <span>Trạng thái cảnh báo</span>
-          <select value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}>
-            <option value="all">Tất cả</option>
-            <option value="warning">Cảnh báo</option>
-            <option value="ok">Ổn định</option>
-          </select>
+          <CustomSelect
+            value={filters.status}
+            onChange={(val) => setFilters((prev) => ({ ...prev, status: val }))}
+            options={warningStatusOptions}
+            placeholder="Tất cả"
+          />
         </label>
       </div>
 
@@ -77,7 +85,7 @@ export default function AttendanceReportPage() {
                 <th>Đi muộn</th>
                 <th>Vắng</th>
                 <th>Có phép</th>
-                <th>Attendance %</th>
+                <th>Tỷ lệ đi học</th>
                 <th>Cảnh báo</th>
               </tr>
             </thead>

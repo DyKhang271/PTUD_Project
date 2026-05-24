@@ -10,8 +10,8 @@ export default function PlannedCoursesTable({ courses, selectedCourseCode, onSel
     <div className="table-card">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Mon du kien mo theo chuong trinh khung</h2>
-          <p className="page-subtitle">Nhan vao tung mon de xem cac lop hoc phan thuc te da mo trong hoc ky da chon.</p>
+          <h2 className="page-title">Môn dự kiến mở theo chương trình khung</h2>
+          <p className="page-subtitle">Nhấn vào từng môn để xem các lớp học phần thực tế đã mở trong học kỳ đã chọn.</p>
         </div>
       </div>
 
@@ -19,14 +19,14 @@ export default function PlannedCoursesTable({ courses, selectedCourseCode, onSel
         <table className="interactive-table">
           <thead>
             <tr>
-              <th>Ma mon</th>
-              <th>Ten mon</th>
-              <th>So tin chi</th>
-              <th>Loai mon</th>
-              <th>So sinh vien can hoc</th>
-              <th>So lop de xuat</th>
-              <th>So lop da mo</th>
-              <th>Trang thai</th>
+              <th>Mã môn</th>
+              <th>Tên môn</th>
+              <th>Số tín chỉ</th>
+              <th>Loại môn</th>
+              <th>Số sinh viên cần học</th>
+              <th>Số lớp đề xuất</th>
+              <th>Số lớp đã mở</th>
+              <th>Trạng thái</th>
             </tr>
           </thead>
           <tbody>
@@ -55,7 +55,7 @@ export default function PlannedCoursesTable({ courses, selectedCourseCode, onSel
           </tbody>
         </table>
       ) : (
-        <EmptyState message="Chua co du lieu ke hoach mo lop cho lua chon nay." />
+        <EmptyState message="Chưa có dữ liệu kế hoạch mở lớp cho lựa chọn này." />
       )}
     </div>
   );

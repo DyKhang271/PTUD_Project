@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import StatusBadge from "../../components/StatusBadge";
+import CustomSelect from "../../components/CustomSelect";
 import {
   closeAttendanceSession,
   createAttendanceSession,
@@ -108,8 +109,8 @@ export default function AttendanceSessionPage() {
     }
   }
 
-  async function handleSelectSession(event) {
-    const selected = base.sessions.find((item) => item.id === event.target.value);
+  async function handleSelectSession(val) {
+    const selected = base.sessions.find((item) => item.id === val);
     setSession(selected || null);
     setOpenPayload(null);
     setActionError("");
@@ -195,6 +196,22 @@ export default function AttendanceSessionPage() {
     }).length;
   }, [base.students, records, draft]);
 
+  const timetableOptions = useMemo(() => [
+    { value: "", label: "Chọn thủ công" },
+    ...base.timetable.map((item) => ({
+      value: item.id,
+      label: `Thứ ${item.day_of_week} - ${item.start_time || "--"} - ${item.end_time || "--"}`
+    }))
+  ], [base.timetable]);
+
+  const sessionSelectOptions = useMemo(() => [
+    { value: "", label: "Chọn phiên" },
+    ...base.sessions.map((item) => ({
+      value: item.id,
+      label: `${item.session_date} ${item.start_time || "--"} - ${item.status}`
+    }))
+  ], [base.sessions]);
+
   if (base.loading) return <LoadingState label="Đang tải không gian điểm danh..." />;
   if (base.error) return <ErrorState message={base.error} onRetry={loadBase} />;
   if (!base.section) return <EmptyState message="Không tìm thấy lớp học phần." />;
@@ -215,25 +232,20 @@ export default function AttendanceSessionPage() {
           <h3>Tạo phiên điểm danh</h3>
           <label className="field-group">
             <span>Buổi học</span>
-            <select
+            <CustomSelect
               value={form.timetable_entry_id}
-              onChange={(event) => {
-                const selected = base.timetable.find((item) => item.id === event.target.value);
+              onChange={(val) => {
+                const selected = base.timetable.find((item) => item.id === val);
                 setForm((prev) => ({
                   ...prev,
-                  timetable_entry_id: event.target.value,
+                  timetable_entry_id: val,
                   start_time: selected?.start_time || prev.start_time,
                   end_time: selected?.end_time || prev.end_time,
                 }));
               }}
-            >
-              <option value="">Chọn thủ công</option>
-              {base.timetable.map((item) => (
-                <option key={item.id} value={item.id}>
-                  Thứ {item.day_of_week} - {item.start_time || "--"} - {item.end_time || "--"}
-                </option>
-              ))}
-            </select>
+              options={timetableOptions}
+              placeholder="Chọn thủ công"
+            />
           </label>
           <div className="inline-form">
             <label className="field-group">
@@ -260,14 +272,12 @@ export default function AttendanceSessionPage() {
           <h3>Mở phiên đã tạo</h3>
           <label className="field-group">
             <span>Phiên điểm danh</span>
-            <select value={session?.id || ""} onChange={handleSelectSession}>
-              <option value="">Chọn phiên</option>
-              {base.sessions.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.session_date} {item.start_time || "--"} - {item.status}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              value={session?.id || ""}
+              onChange={handleSelectSession}
+              options={sessionSelectOptions}
+              placeholder="Chọn phiên"
+            />
           </label>
           {session ? (
             <div className="section-stack" style={{ marginTop: "8px" }}>
@@ -354,13 +364,12 @@ export default function AttendanceSessionPage() {
                     <td style={{ fontWeight: 600 }}>{student.student_external_id}</td>
                     <td>{student.full_name || "--"}</td>
                     <td>
-                      <select 
+                      <CustomSelect 
                         value={row.status} 
-                        onChange={(event) => updateDraft(student.student_external_id, { status: event.target.value })}
-                        style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", background: "transparent", color: "var(--text)" }}
-                      >
-                        {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                      </select>
+                        onChange={(val) => updateDraft(student.student_external_id, { status: val })}
+                        options={statusOptions}
+                        placeholder="Chọn..."
+                      />
                     </td>
                     <td>
                       <input 
