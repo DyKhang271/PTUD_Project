@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from datetime import date
 import re
+import unicodedata
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -18,6 +20,7 @@ from app.schemas.section_schema import (
     CourseSectionRead,
     SectionStudentRead,
     SectionStudentsImportResponse,
+    TeacherOptionRead,
 )
 from app.repositories import timetable_repo
 from app.services.core_api_client import CoreApiClient, normalize_student_payload, normalize_teacher_payload
@@ -71,6 +74,11 @@ def _normalize_term_lookup(value: str | None) -> str:
     return re.sub(r"[\s()_\-]+", "", str(value or "").strip()).lower()
 
 
+def _normalize_search_text(value: str | None) -> str:
+    raw = unicodedata.normalize("NFKD", str(value or "").strip().lower())
+    return "".join(char for char in raw if not unicodedata.combining(char))
+
+
 def _find_source_term(source_terms: list[dict], value: str | None) -> dict | None:
     normalized_value = _normalize_term_lookup(value)
     if not normalized_value:
@@ -84,6 +92,37 @@ def _find_source_term(source_terms: list[dict], value: str | None) -> dict | Non
         if normalized_value in candidates:
             return term
     return None
+
+
+def _infer_term_date_range(term_code: str | None) -> tuple[date, date] | None:
+    normalized = str(term_code or "").strip().upper()
+    match = re.fullmatch(r"HK([123])_(\d{4})_(\d{4})", normalized)
+    if not match:
+        return None
+
+    term_number = int(match.group(1))
+    year_start = int(match.group(2))
+    year_end = int(match.group(3))
+    if year_end != year_start + 1:
+        return None
+
+    if term_number == 1:
+        return date(year_start, 9, 1), date(year_start, 12, 31)
+    if term_number == 2:
+        return date(year_end, 2, 1), date(year_end, 6, 30)
+    return date(year_end, 7, 1), date(year_end, 8, 31)
+
+
+def _apply_inferred_term_dates(values: dict) -> dict:
+    normalized = dict(values)
+    if normalized.get("start_date") and normalized.get("end_date"):
+        return normalized
+    inferred = _infer_term_date_range(normalized.get("term_code"))
+    if inferred is None:
+        return normalized
+    normalized.setdefault("start_date", inferred[0])
+    normalized.setdefault("end_date", inferred[1])
+    return normalized
 
 
 def _derive_section_academic_profile(
@@ -119,6 +158,7 @@ def _to_course_section_read(db: Session, section: CourseSection) -> CourseSectio
         program_name=section.program_name,
         student_count=section.student_count,
         total_sessions=section.total_sessions,
+        note=section.note,
         status=section.status,
         term_code=section.term.term_code if section.term else None,
         term_name=section.term.term_name if section.term else None,
@@ -136,7 +176,7 @@ def get_section_or_404(db: Session, section_id: UUID):
 
 def create_term(db: Session, values: dict):
     try:
-        term = section_repo.create_term(db, values)
+        term = section_repo.create_term(db, _apply_inferred_term_dates(values))
         db.commit()
         return term
     except IntegrityError as exc:
@@ -149,12 +189,106 @@ def update_term(db: Session, term_id: UUID, values: dict):
     if term is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Academic term not found")
     try:
-        updated = section_repo.update_term(db, term, values)
+        updated = section_repo.update_term(db, term, _apply_inferred_term_dates(values))
         db.commit()
         return updated
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Term update conflicts with existing data") from exc
+
+
+def backfill_term_date_ranges(db: Session) -> dict[str, list[str] | int]:
+    updated_term_codes: list[str] = []
+    skipped_term_codes: list[str] = []
+    for term in section_repo.list_terms(db):
+        if term.start_date and term.end_date:
+            skipped_term_codes.append(term.term_code)
+            continue
+        inferred = _infer_term_date_range(term.term_code)
+        if inferred is None:
+            skipped_term_codes.append(term.term_code)
+            continue
+        term.start_date = term.start_date or inferred[0]
+        term.end_date = term.end_date or inferred[1]
+        updated_term_codes.append(term.term_code)
+    db.commit()
+    return {
+        "updated_count": len(updated_term_codes),
+        "updated_term_codes": updated_term_codes,
+        "skipped_term_codes": skipped_term_codes,
+    }
+
+
+def sync_teacher_cache_from_portal(db: Session) -> int:
+    teacher_accounts = CoreApiClient().get_teacher_accounts() or []
+    synced_count = 0
+    for teacher in teacher_accounts:
+        teacher_id = str(teacher.get("username") or "").strip()
+        if not teacher_id:
+            continue
+        external_user_repo.upsert_external_user(
+            db,
+            external_user_id=teacher_id,
+            role="teacher",
+            full_name=teacher.get("name"),
+            email=teacher.get("email"),
+            faculty=teacher.get("faculty") or teacher.get("department"),
+        )
+        synced_count += 1
+    db.commit()
+    return synced_count
+
+
+def search_teachers(
+    db: Session,
+    *,
+    q: str | None = None,
+    faculty: str | None = None,
+    limit: int = 50,
+    refresh: bool = False,
+) -> list[TeacherOptionRead]:
+    if refresh:
+        sync_teacher_cache_from_portal(db)
+    teachers = external_user_repo.search_cached_users(
+        db,
+        role="teacher",
+        q=q,
+        faculty=faculty,
+        limit=limit,
+    )
+    if not teachers and q:
+        sync_teacher_cache_from_portal(db)
+        teachers = external_user_repo.search_cached_users(
+            db,
+            role="teacher",
+            q=q,
+            faculty=faculty,
+            limit=limit,
+        )
+    if q and not teachers:
+        normalized_query = _normalize_search_text(q)
+        fallback_teachers = external_user_repo.search_cached_users(
+            db,
+            role="teacher",
+            faculty=faculty,
+            limit=max(limit * 5, 200),
+        )
+        teachers = [
+            teacher
+            for teacher in fallback_teachers
+            if normalized_query in _normalize_search_text(teacher.external_user_id)
+            or normalized_query in _normalize_search_text(teacher.full_name)
+            or normalized_query in _normalize_search_text(teacher.faculty)
+        ][:limit]
+    return [
+        TeacherOptionRead(
+            teacher_id=teacher.external_user_id,
+            teacher_name=teacher.full_name,
+            faculty=teacher.faculty,
+            email=teacher.email,
+        )
+        for teacher in teachers
+    ]
 
 
 def list_sections_enriched(
@@ -191,6 +325,7 @@ def list_sections_enriched(
             program_name=section.program_name,
             student_count=section.student_count,
             total_sessions=section.total_sessions,
+            note=section.note,
             status=section.status,
             term_code=section.term.term_code if section.term else None,
             term_name=section.term.term_name if section.term else None,
@@ -548,11 +683,11 @@ def import_course_sections_from_core(db: Session, payload: dict) -> CoreCourseSe
             if term is None:
                 term = section_repo.create_term(
                     db,
-                    {
+                    _apply_inferred_term_dates({
                         "term_code": term_code,
                         "term_name": str(item.get("term") or term_code),
                         "status": "active",
-                    },
+                    }),
                 )
                 imported_terms += 1
 

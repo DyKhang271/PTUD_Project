@@ -18,6 +18,7 @@ class CourseSectionBase(BaseModel):
     program_name: str | None = None
     student_count: int = 0
     total_sessions: int | None = None
+    note: str | None = None
     status: str = "active"
 
 
@@ -35,6 +36,7 @@ class CourseSectionUpdate(BaseModel):
     program_name: str | None = None
     student_count: int | None = None
     total_sessions: int | None = None
+    note: str | None = None
     status: str | None = None
 
 
@@ -124,3 +126,10 @@ class CoreCourseSectionsImportResponse(BaseModel):
 
 class SectionTeacherAssignRequest(BaseModel):
     teacher_id: str = Field(min_length=1)
+
+
+class TeacherOptionRead(BaseModel):
+    teacher_id: str
+    teacher_name: str | None = None
+    faculty: str | None = None
+    email: str | None = None

@@ -26,3 +26,12 @@ class AcademicTerm(Base):
 
     sections = relationship("CourseSection", back_populates="term")
 
+    @property
+    def has_date_range(self) -> bool:
+        return self.start_date is not None and self.end_date is not None
+
+    @property
+    def date_range_warning(self) -> str | None:
+        if self.has_date_range:
+            return None
+        return "Học kỳ chưa có ngày bắt đầu/kết thúc đầy đủ. Validation theo phạm vi học kỳ sẽ không áp dụng trọn vẹn."

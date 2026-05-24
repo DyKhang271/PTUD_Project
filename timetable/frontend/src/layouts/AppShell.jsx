@@ -16,7 +16,7 @@ export default function AppShell({ title, links }) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="sidebar-eyebrow">Timetable</span>
+          <span className="sidebar-eyebrow">🎓 IUH Portal</span>
           <h1>{title}</h1>
         </div>
         <nav className="sidebar-nav">

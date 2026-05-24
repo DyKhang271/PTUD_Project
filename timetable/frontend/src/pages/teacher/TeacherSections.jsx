@@ -25,42 +25,49 @@ export default function TeacherSections() {
   if (!state.sections.length) return <EmptyState message="Giảng viên chưa có lớp học phần nào." />;
 
   return (
-    <div className="table-card">
+    <div className="page-shell">
       <div className="page-header">
-        <h2 className="page-title">Điểm danh</h2>
-        <p className="page-subtitle">Chọn lớp học phần để tạo hoặc tiếp tục phiên điểm danh thủ công.</p>
+        <div>
+          <h2 className="page-title">Điểm danh</h2>
+          <p className="page-subtitle">Chọn lớp học phần để tạo hoặc tiếp tục phiên điểm danh thủ công.</p>
+        </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Mã môn</th>
-            <th>Tên môn</th>
-            <th>Lớp HP</th>
-            <th>Số sinh viên</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {state.sections.map((section) => (
-            <tr key={section.id}>
-              <td>{section.course_code}</td>
-              <td>{section.course_name}</td>
-              <td>{section.section_code}</td>
-              <td>{section.student_count || "--"}</td>
-              <td>
-                <div className="table-actions">
-                  <Link className="primary-button" to={`/teacher/sections/${section.id}/attendance`}>
-                    Điểm danh
-                  </Link>
-                  <Link className="secondary-button" to={`/teacher/sections/${section.id}/report`}>
-                    Báo cáo
-                  </Link>
-                </div>
-              </td>
+      
+      <div className="data-card">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Mã môn</th>
+              <th>Tên môn</th>
+              <th>Lớp HP</th>
+              <th>Số sinh viên</th>
+              <th>Thao tác</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {state.sections.map((section) => (
+              <tr key={section.id}>
+                <td>{section.course_code}</td>
+                <td>
+                  <strong>{section.course_name}</strong>
+                </td>
+                <td>{section.section_code}</td>
+                <td>{section.student_count || "--"}</td>
+                <td>
+                  <div className="table-actions">
+                    <Link className="primary-button" to={`/teacher/sections/${section.id}/attendance`}>
+                      Điểm danh
+                    </Link>
+                    <Link className="secondary-button" to={`/teacher/sections/${section.id}/report`}>
+                      Báo cáo
+                    </Link>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

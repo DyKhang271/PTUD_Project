@@ -82,6 +82,9 @@ class CoreApiClient:
     def get_teacher(self, teacher_id: str) -> dict[str, Any]:
         return self._request("GET", f"/internal/teachers/{teacher_id}")
 
+    def get_teacher_accounts(self) -> list[dict[str, Any]]:
+        return self._request("GET", "/api/auth/teachers")
+
     def get_students_by_class(self, class_name: str) -> dict[str, Any]:
         return self._request("GET", "/internal/students", params={"class_name": class_name})
 

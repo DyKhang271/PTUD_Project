@@ -200,16 +200,18 @@ export default function AttendanceSessionPage() {
   if (!base.section) return <EmptyState message="Không tìm thấy lớp học phần." />;
 
   return (
-    <div className="section-stack">
+    <div className="page-shell">
       <div className="page-header">
-        <h2 className="page-title">Điểm danh thủ công</h2>
-        <p className="page-subtitle">{base.section.course_name} - {base.section.section_code}</p>
+        <div>
+          <h2 className="page-title">Điểm danh thủ công</h2>
+          <p className="page-subtitle">{base.section.course_name} - {base.section.section_code}</p>
+        </div>
       </div>
 
-      {actionError ? <div className="state-card state-error">{actionError}</div> : null}
+      {actionError ? <div className="badge danger" style={{ display: "block", width: "100%", padding: "12px", borderRadius: "var(--radius-md)" }}>⚠️ {actionError}</div> : null}
 
       <div className="two-column-grid">
-        <form className="panel form-grid" onSubmit={handleCreateSession}>
+        <form className="data-card form-grid" onSubmit={handleCreateSession}>
           <h3>Tạo phiên điểm danh</h3>
           <label className="field-group">
             <span>Buổi học</span>
@@ -236,25 +238,25 @@ export default function AttendanceSessionPage() {
           <div className="inline-form">
             <label className="field-group">
               <span>Ngày</span>
-              <input type="date" value={form.session_date} onChange={(event) => setForm((prev) => ({ ...prev, session_date: event.target.value }))} />
+              <input type="date" value={form.session_date} onChange={(event) => setForm((current) => ({ ...current, session_date: event.target.value }))} />
             </label>
             <label className="field-group">
               <span>Bắt đầu</span>
-              <input type="time" value={form.start_time} onChange={(event) => setForm((prev) => ({ ...prev, start_time: event.target.value }))} />
+              <input type="time" value={form.start_time} onChange={(event) => setForm((current) => ({ ...current, start_time: event.target.value }))} />
             </label>
             <label className="field-group">
               <span>Kết thúc</span>
-              <input type="time" value={form.end_time} onChange={(event) => setForm((prev) => ({ ...prev, end_time: event.target.value }))} />
+              <input type="time" value={form.end_time} onChange={(event) => setForm((current) => ({ ...current, end_time: event.target.value }))} />
             </label>
           </div>
           <label className="field-group">
             <span>Ghi chú buổi học</span>
-            <textarea value={form.note} onChange={(event) => setForm((prev) => ({ ...prev, note: event.target.value }))} rows="3" />
+            <textarea value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} rows="3" />
           </label>
           <button className="primary-button" type="submit">Tạo phiên</button>
         </form>
 
-        <div className="panel section-stack">
+        <div className="data-card section-stack">
           <h3>Mở phiên đã tạo</h3>
           <label className="field-group">
             <span>Phiên điểm danh</span>
@@ -268,36 +270,42 @@ export default function AttendanceSessionPage() {
             </select>
           </label>
           {session ? (
-            <div className="section-stack">
-              <div className="cards-grid">
-                <div>
-                  <strong>Lớp</strong>
-                  <div>{base.section.section_code}</div>
+            <div className="section-stack" style={{ marginTop: "8px" }}>
+              <div className="cards-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: "10px" }}>
+                <div className="stat-card" style={{ padding: "12px", borderRadius: "var(--radius-md)" }}>
+                  <strong style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>Lớp</strong>
+                  <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{base.section.section_code}</div>
                 </div>
-                <div>
-                  <strong>Môn học</strong>
-                  <div>{base.section.course_name}</div>
+                <div className="stat-card" style={{ padding: "12px", borderRadius: "var(--radius-md)" }}>
+                  <strong style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>Môn học</strong>
+                  <div style={{ fontWeight: 600, fontSize: "0.95rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={base.section.course_name}>{base.section.course_name}</div>
                 </div>
-                <div>
-                  <strong>Giảng viên</strong>
-                  <div>{base.section.teacher_external_id || "--"}</div>
+                <div className="stat-card" style={{ padding: "12px", borderRadius: "var(--radius-md)" }}>
+                  <strong style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>Giảng viên</strong>
+                  <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>{base.section.teacher_external_id || "--"}</div>
                 </div>
-                <div>
-                  <strong>Trạng thái</strong>
+                <div className="stat-card" style={{ padding: "12px", borderRadius: "var(--radius-md)" }}>
+                  <strong style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>Trạng thái</strong>
                   <div><StatusBadge status={session.status} /></div>
                 </div>
               </div>
-              <div className="helper-text">Ngày {session.session_date} | {session.start_time || "--"} - {session.end_time || "--"}</div>
-              <details>
-                <summary>Student self check-in (advanced)</summary>
-                <div className="section-stack">
-                  <p className="helper-text">Chỉ dùng khi muốn cho sinh viên tự check-in bằng mã hoặc QR.</p>
-                  <button className="secondary-button" onClick={handleOpenSession} type="button">Tạo mã self check-in</button>
+              <div className="helper-text" style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>Ngày {session.session_date} | {session.start_time || "--"} - {session.end_time || "--"}</div>
+              <details style={{ background: "var(--bg)", padding: "12px", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "0.9rem" }}>Tự check-in của sinh viên (Self Check-in)</summary>
+                <div className="section-stack" style={{ marginTop: "12px" }}>
+                  <p className="helper-text" style={{ fontSize: "0.85rem" }}>Chỉ dùng khi muốn cho sinh viên tự check-in bằng mã hoặc QR.</p>
+                  <button className="secondary-button" style={{ padding: "8px 12px" }} onClick={handleOpenSession} type="button">Tạo mã self check-in</button>
                   {openPayload ? (
-                    <div className="section-stack">
-                      <div><strong>Check-in code</strong><div className="code-block">{openPayload.checkin_code}</div></div>
-                      <div><strong>QR token</strong><div className="code-block">{openPayload.qr_token}</div></div>
-                      <div className="helper-text">Hết hạn lúc: {openPayload.expires_at}</div>
+                    <div className="section-stack" style={{ marginTop: "12px", gap: "8px" }}>
+                      <div>
+                        <strong>Mã check-in</strong>
+                        <div className="code-block" style={{ marginTop: "4px", padding: "10px", fontSize: "1.1rem" }}>{openPayload.checkin_code}</div>
+                      </div>
+                      <div>
+                        <strong>QR Token</strong>
+                        <div className="code-block" style={{ marginTop: "4px", padding: "10px" }}>{openPayload.qr_token}</div>
+                      </div>
+                      <div className="helper-text" style={{ fontSize: "0.8rem" }}>Hết hạn lúc: {openPayload.expires_at}</div>
                     </div>
                   ) : null}
                 </div>
@@ -309,31 +317,33 @@ export default function AttendanceSessionPage() {
         </div>
       </div>
 
-      <div className="table-card section-stack">
-        <div className="page-header">
-          <h3>Danh sách sinh viên</h3>
-          <p className="page-subtitle">Phiên mới tự khởi tạo toàn bộ sinh viên ở trạng thái Vắng. Giảng viên cập nhật thủ công rồi lưu một lần.</p>
+      <div className="data-card section-stack">
+        <div className="page-header" style={{ marginBottom: "12px" }}>
+          <div>
+            <h3 className="page-title">Danh sách sinh viên</h3>
+            <p className="page-subtitle">Phiên mới tự khởi tạo toàn bộ sinh viên ở trạng thái Vắng. Giảng viên cập nhật thủ công rồi lưu một lần.</p>
+          </div>
         </div>
-        <div className="button-row">
-          <button className="secondary-button" onClick={() => markAll("present")} disabled={!session} type="button">Mark all present</button>
-          <button className="secondary-button" onClick={() => markAll("absent")} disabled={!session} type="button">Mark all absent</button>
-          <button className="secondary-button" onClick={resetChanges} disabled={!session || !changedCount} type="button">Reset changes</button>
-          <button className="primary-button" onClick={saveAttendance} disabled={!session || saving} type="button">Save attendance{changedCount ? ` (${changedCount})` : ""}</button>
-          <button className="secondary-button" onClick={handleOpenSession} disabled={!session || session.status === "open"} type="button">Reopen session</button>
-          <button className="danger-button" onClick={handleCloseSession} disabled={!session || session.status === "closed"} type="button">Close session</button>
+        <div className="button-row" style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+          <button className="secondary-button" onClick={() => markAll("present")} disabled={!session} type="button">Chọn tất cả có mặt</button>
+          <button className="secondary-button" onClick={() => markAll("absent")} disabled={!session} type="button">Chọn tất cả vắng</button>
+          <button className="secondary-button" onClick={resetChanges} disabled={!session || !changedCount} type="button">Hủy thay đổi</button>
+          <button className="primary-button" onClick={saveAttendance} disabled={!session || saving} type="button">Lưu điểm danh{changedCount ? ` (${changedCount})` : ""}</button>
+          <button className="secondary-button" onClick={handleOpenSession} disabled={!session || session.status === "open"} type="button">Mở lại phiên</button>
+          <button className="danger-button" onClick={handleCloseSession} disabled={!session || session.status === "closed"} type="button">Đóng phiên điểm danh</button>
         </div>
 
         {!session ? (
           <EmptyState message="Tạo hoặc chọn phiên để xem danh sách điểm danh." />
         ) : base.students.length ? (
-          <table>
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Student ID</th>
-                <th>Full name</th>
-                <th>Attendance status</th>
-                <th>Note</th>
-                <th>Updated at</th>
+                <th>MSSV</th>
+                <th>Họ và tên</th>
+                <th>Trạng thái điểm danh</th>
+                <th>Ghi chú</th>
+                <th>Cập nhật lúc</th>
               </tr>
             </thead>
             <tbody>
@@ -341,17 +351,26 @@ export default function AttendanceSessionPage() {
                 const row = draft[student.student_external_id] || { status: "unknown", note: "" };
                 return (
                   <tr key={student.student_external_id}>
-                    <td>{student.student_external_id}</td>
+                    <td style={{ fontWeight: 600 }}>{student.student_external_id}</td>
                     <td>{student.full_name || "--"}</td>
                     <td>
-                      <select value={row.status} onChange={(event) => updateDraft(student.student_external_id, { status: event.target.value })}>
+                      <select 
+                        value={row.status} 
+                        onChange={(event) => updateDraft(student.student_external_id, { status: event.target.value })}
+                        style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", background: "transparent", color: "var(--text)" }}
+                      >
                         {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                       </select>
                     </td>
                     <td>
-                      <input value={row.note || ""} onChange={(event) => updateDraft(student.student_external_id, { note: event.target.value })} placeholder="Ghi chú" />
+                      <input 
+                        value={row.note || ""} 
+                        onChange={(event) => updateDraft(student.student_external_id, { note: event.target.value })} 
+                        placeholder="Ghi chú thêm" 
+                        style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "6px 10px", width: "100%", maxWidth: "250px", background: "transparent", color: "var(--text)" }}
+                      />
                     </td>
-                    <td>{row.updated_at ? new Date(row.updated_at).toLocaleString("vi-VN") : "--"}</td>
+                    <td style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{row.updated_at ? new Date(row.updated_at).toLocaleString("vi-VN") : "--"}</td>
                   </tr>
                 );
               })}

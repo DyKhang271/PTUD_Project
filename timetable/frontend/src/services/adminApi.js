@@ -70,6 +70,16 @@ export async function fetchTimetableCourseGroups(params = {}) {
   return data;
 }
 
+export async function fetchInvalidTimetableEntries(params = {}) {
+  const { data } = await api.get("/admin/timetable/invalid-entries", { params });
+  return data;
+}
+
+export async function cleanupInvalidTimetableEntries(params = {}) {
+  const { data } = await api.post("/admin/timetable/cleanup-invalid", null, { params });
+  return data;
+}
+
 export async function createTimetableEntry(payload) {
   const { data } = await api.post("/admin/timetable", payload);
   return data;
@@ -85,8 +95,13 @@ export async function deleteTimetableEntry(entryId) {
 }
 
 export async function fetchExams(sectionId) {
-  const params = sectionId ? { section_id: sectionId } : {};
+  const params = typeof sectionId === "object" ? sectionId : sectionId ? { section_id: sectionId } : {};
   const { data } = await api.get("/admin/exams", { params });
+  return data;
+}
+
+export async function fetchExamCourseGroups(params = {}) {
+  const { data } = await api.get("/admin/exams/course-groups", { params });
   return data;
 }
 
@@ -141,5 +156,15 @@ export async function fetchAcademicImportOptions() {
 export async function fetchAcademicImportDebugSummary(termCode) {
   const params = termCode ? { term_code: termCode } : {};
   const { data } = await api.get("/admin/import/debug-summary", { params });
+  return data;
+}
+
+export async function fetchTeacherOptions(params = {}) {
+  const { data } = await api.get("/admin/teachers/search", { params });
+  return data;
+}
+
+export async function backfillTermDates() {
+  const { data } = await api.post("/admin/terms/backfill-dates");
   return data;
 }

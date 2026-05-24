@@ -33,16 +33,21 @@ from app.schemas.section_schema import (
     SectionStudentRead,
     SectionStudentsImportRequest,
     SectionStudentsImportResponse,
+    TeacherOptionRead,
 )
-from app.schemas.term_schema import TermCreate, TermRead, TermUpdate
+from app.schemas.term_schema import TermBackfillSummaryRead, TermCreate, TermRead, TermUpdate
 from app.schemas.timetable_schema import (
+    AdminExamCourseGroupRead,
+    AdminExamScheduleRead,
     AdminTimetableCourseGroupRead,
     AdminTimetableEntryRead,
     ExamScheduleCreate,
     ExamScheduleRead,
     ExamScheduleUpdate,
+    InvalidTimetableIssueRead,
     SectionTimetableCreate,
     SectionTimetableUpdate,
+    TimetableCleanupSummaryRead,
     TimetableEntryCreate,
     TimetableEntryRead,
     TimetableEntryUpdate,
@@ -112,6 +117,11 @@ def create_term(payload: TermCreate, db: Annotated[Session, Depends(get_db)]):
 @router.get("/terms", response_model=list[TermRead])
 def list_terms(db: Annotated[Session, Depends(get_db)]):
     return section_repo.list_terms(db)
+
+
+@router.post("/terms/backfill-dates", response_model=TermBackfillSummaryRead)
+def backfill_term_dates(db: Annotated[Session, Depends(get_db)]):
+    return section_service.backfill_term_date_ranges(db)
 
 
 @router.put("/terms/{term_id}", response_model=TermRead)
@@ -188,6 +198,17 @@ def update_course_section(section_id: UUID, payload: CourseSectionUpdate, db: An
 @router.put("/sections/{section_id}/teacher", response_model=CourseSectionRead)
 def assign_section_teacher(section_id: UUID, payload: SectionTeacherAssignRequest, db: Annotated[Session, Depends(get_db)]):
     return section_service.assign_teacher(db, section_id, payload.teacher_id)
+
+
+@router.get("/teachers/search", response_model=list[TeacherOptionRead])
+def search_teachers(
+    db: Annotated[Session, Depends(get_db)],
+    q: str | None = None,
+    faculty: str | None = None,
+    limit: int = 50,
+    refresh: bool = False,
+):
+    return section_service.search_teachers(db, q=q, faculty=faculty, limit=limit, refresh=refresh)
 
 
 @router.delete("/course-sections/{section_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -307,6 +328,32 @@ def update_timetable_entry_alias(entry_id: UUID, payload: SectionTimetableUpdate
     return timetable_service.update_section_timetable_entry(db, entry_id=entry_id, values=payload.model_dump(exclude_unset=True))
 
 
+@router.get("/timetable/invalid-entries", response_model=list[InvalidTimetableIssueRead])
+def list_invalid_timetable_entries(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+):
+    return timetable_service.list_invalid_timetable_entries(
+        db,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+    )
+
+
+@router.post("/timetable/cleanup-invalid", response_model=TimetableCleanupSummaryRead)
+def cleanup_invalid_timetable_entries(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+    entry_ids: list[UUID] | None = None,
+):
+    return timetable_service.cleanup_invalid_timetable_entries(
+        db,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+        entry_ids=entry_ids,
+    )
+
+
 @router.delete("/timetable/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_timetable(entry_id: UUID, db: Annotated[Session, Depends(get_db)]):
     timetable_service.delete_timetable_entry(db, entry_id)
@@ -323,9 +370,62 @@ def create_exam(payload: ExamScheduleCreate, db: Annotated[Session, Depends(get_
     return timetable_service.create_exam_schedule(db, payload.model_dump())
 
 
-@router.get("/exams", response_model=list[ExamScheduleRead])
-def list_exams(db: Annotated[Session, Depends(get_db)], section_id: UUID | None = None):
-    return timetable_repo.list_exam_schedules(db, section_id=section_id)
+@router.get("/exams", response_model=list[AdminExamScheduleRead])
+def list_exams(
+    db: Annotated[Session, Depends(get_db)],
+    section_id: UUID | None = None,
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+    faculty: str | None = None,
+    faculty_code: str | None = None,
+    program: str | None = None,
+    program_code: str | None = None,
+    course_id: str | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    scheduled_status: str = "all",
+):
+    return timetable_service.list_admin_exam_entries(
+        db,
+        section_id=section_id,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+        faculty=faculty or faculty_code,
+        program_name=program or program_code,
+        course_code=course_id,
+        status=status,
+        q=q,
+        scheduled_status=scheduled_status,
+    )
+
+
+@router.get("/exams/course-groups", response_model=list[AdminExamCourseGroupRead])
+def list_exam_course_groups(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+    faculty: str | None = None,
+    faculty_code: str | None = None,
+    program: str | None = None,
+    program_code: str | None = None,
+    course_id: str | None = None,
+    section_id: UUID | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    scheduled_status: str = "all",
+    curriculum_semester: int | None = None,
+):
+    return timetable_service.list_admin_exam_course_groups(
+        db,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+        faculty=faculty or faculty_code,
+        program_name=program or program_code,
+        course_code=course_id,
+        section_id=section_id,
+        status=status,
+        q=q,
+        scheduled_status=scheduled_status,
+        curriculum_semester=curriculum_semester,
+    )
 
 
 @router.put("/exams/{exam_id}", response_model=ExamScheduleRead)

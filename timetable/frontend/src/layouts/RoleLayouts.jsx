@@ -1,24 +1,24 @@
 import AppShell from "./AppShell";
 
 const studentLinks = [
-  { to: "/student/dashboard", label: "Dashboard" },
-  { to: "/student/timetable", label: "Thoi khoa bieu" },
-  { to: "/student/exams", label: "Lich thi" },
-  { to: "/student/attendance", label: "Lich su diem danh" },
+  { to: "/student/dashboard", label: "📊 Trang chủ" },
+  { to: "/student/timetable", label: "📅 Thời khóa biểu" },
+  { to: "/student/exams", label: "📝 Lịch thi" },
+  { to: "/student/attendance", label: "🕒 Lịch sử điểm danh" },
 ];
 
 const teacherLinks = [
-  { to: "/teacher/dashboard", label: "Dashboard" },
-  { to: "/teacher/sections", label: "Diem danh" },
+  { to: "/teacher/dashboard", label: "📊 Trang chủ" },
+  { to: "/teacher/sections", label: "⏱️ Điểm danh" },
 ];
 
 const adminLinks = [
-  { to: "/admin/dashboard", label: "Dashboard" },
-  { to: "/admin/academic-data", label: "Du lieu hoc vu" },
-  { to: "/admin/terms", label: "Hoc ky" },
-  { to: "/admin/sections", label: "Lop hoc phan" },
-  { to: "/admin/scheduling", label: "Lich hoc & thi" },
-  { to: "/admin/attendance", label: "Diem danh" },
+  { to: "/admin/dashboard", label: "📊 Trang chủ" },
+  { to: "/admin/academic-data", label: "🗂️ Dữ liệu học vụ" },
+  { to: "/admin/terms", label: "🏫 Quản lý học kỳ" },
+  { to: "/admin/sections", label: "🏫 Lớp học phần" },
+  { to: "/admin/scheduling", label: "📅 Lịch học & thi" },
+  { to: "/admin/attendance", label: "⏱️ Chính sách điểm danh" },
 ];
 
 export function StudentLayout() {

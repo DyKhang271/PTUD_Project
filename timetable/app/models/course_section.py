@@ -30,6 +30,7 @@ class CourseSection(Base):
     program_name: Mapped[str | None] = mapped_column(Text)
     student_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     total_sessions: Mapped[int | None] = mapped_column(Integer)
+    note: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

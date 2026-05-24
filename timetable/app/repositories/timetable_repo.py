@@ -195,6 +195,57 @@ def list_exam_schedules(db: Session, *, section_id: UUID | None = None) -> list[
     return list(db.scalars(stmt).all())
 
 
+def list_exam_schedules_with_sections(
+    db: Session,
+    *,
+    section_id: UUID | None = None,
+    term_id: UUID | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+    course_code: str | None = None,
+    statuses: list[str] | None = None,
+    q: str | None = None,
+) -> list[tuple[ExamSchedule, CourseSection]]:
+    stmt = select(ExamSchedule, CourseSection).join(CourseSection, CourseSection.id == ExamSchedule.section_id)
+    normalized_q = str(q or "").strip()
+    if normalized_q:
+        like_pattern = f"%{normalized_q}%"
+        stmt = stmt.outerjoin(
+            ExternalUserCache,
+            (ExternalUserCache.external_user_id == CourseSection.teacher_external_id) & (ExternalUserCache.role == "teacher"),
+        ).where(
+            or_(
+                CourseSection.course_name.ilike(like_pattern),
+                CourseSection.course_code.ilike(like_pattern),
+                CourseSection.section_code.ilike(like_pattern),
+                ExamSchedule.room.ilike(like_pattern),
+                ExamSchedule.location.ilike(like_pattern),
+                ExternalUserCache.full_name.ilike(like_pattern),
+            )
+        )
+    if section_id:
+        stmt = stmt.where(ExamSchedule.section_id == section_id)
+    if term_id:
+        stmt = stmt.where(CourseSection.term_id == term_id)
+    if faculty:
+        stmt = stmt.where(CourseSection.faculty == faculty)
+    if program_name:
+        stmt = stmt.where(CourseSection.program_name == program_name)
+    if course_code:
+        stmt = stmt.where(CourseSection.course_code == course_code)
+    if statuses:
+        stmt = stmt.where(ExamSchedule.status.in_(statuses))
+    stmt = stmt.order_by(
+        CourseSection.faculty.nullslast(),
+        CourseSection.program_name.nullslast(),
+        CourseSection.course_code,
+        CourseSection.section_code,
+        ExamSchedule.exam_date,
+        ExamSchedule.start_time,
+    )
+    return list(db.execute(stmt).all())
+
+
 def list_student_exam_schedules(db: Session, student_external_id: str) -> list[ExamSchedule]:
     stmt = (
         select(ExamSchedule)

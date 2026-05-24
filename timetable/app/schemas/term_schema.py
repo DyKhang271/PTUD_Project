@@ -30,5 +30,13 @@ class TermRead(TermBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    has_date_range: bool = True
+    date_range_warning: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class TermBackfillSummaryRead(BaseModel):
+    updated_count: int
+    updated_term_codes: list[str]
+    skipped_term_codes: list[str]

@@ -23,6 +23,16 @@ class TimetableEntryBase(BaseModel):
     session_type: str = "study"
     note: str | None = None
 
+    @model_validator(mode="after")
+    def validate_time_and_date_range(self):
+        if self.start_period is not None and self.end_period is not None and self.end_period < self.start_period:
+            raise ValueError("end_period must be greater than or equal to start_period")
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValueError("end_time must be greater than start_time")
+        if self.valid_from and self.valid_to and self.valid_to < self.valid_from:
+            raise ValueError("valid_to must be on or after valid_from")
+        return self
+
 
 class TimetableEntryCreate(TimetableEntryBase):
     pass
@@ -43,6 +53,16 @@ class TimetableEntryUpdate(BaseModel):
     status: str | None = None
     session_type: str | None = None
     note: str | None = None
+
+    @model_validator(mode="after")
+    def validate_time_and_date_range(self):
+        if self.start_period is not None and self.end_period is not None and self.end_period < self.start_period:
+            raise ValueError("end_period must be greater than or equal to start_period")
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValueError("end_time must be greater than start_time")
+        if self.valid_from and self.valid_to and self.valid_to < self.valid_from:
+            raise ValueError("valid_to must be on or after valid_from")
+        return self
 
 
 class TimetableEntryRead(TimetableEntryBase):
@@ -144,6 +164,26 @@ class AdminTimetableCourseGroupRead(BaseModel):
     schedules: list[AdminTimetableEntryRead] = Field(default_factory=list)
 
 
+class InvalidTimetableIssueRead(BaseModel):
+    entry_id: UUID
+    section_id: UUID
+    term_id: UUID | None = None
+    term_code: str | None = None
+    section_code: str
+    course_code: str
+    course_name: str
+    reason: str
+    detail: str
+    current_status: str
+    suggested_action: str = "mark_cancelled"
+
+
+class TimetableCleanupSummaryRead(BaseModel):
+    detected_count: int
+    marked_invalid_count: int
+    invalid_entries: list[InvalidTimetableIssueRead] = Field(default_factory=list)
+
+
 class StudentExamScheduleItem(BaseModel):
     id: UUID
     section_id: UUID
@@ -163,6 +203,44 @@ class StudentExamScheduleItem(BaseModel):
     exam_type: str | None = None
     note: str | None = None
     created_at: datetime
+
+
+class AdminExamScheduleRead(BaseModel):
+    id: UUID
+    section_id: UUID
+    term_id: UUID | None = None
+    term_code: str | None = None
+    term_name: str | None = None
+    faculty: str | None = None
+    program_name: str | None = None
+    section_code: str
+    course_code: str
+    course_name: str
+    teacher_external_id: str | None = None
+    teacher_name: str | None = None
+    exam_date: DateType
+    start_time: time | None = None
+    end_time: time | None = None
+    room: str | None = None
+    location: str | None = None
+    exam_type: str | None = None
+    status: str = "scheduled"
+    note: str | None = None
+    created_at: datetime
+
+
+class AdminExamCourseGroupRead(BaseModel):
+    term_id: UUID | None = None
+    term_code: str | None = None
+    term_name: str | None = None
+    faculty: str | None = None
+    program_name: str | None = None
+    course_id: str
+    course_code: str
+    course_name: str
+    section_count: int = 0
+    scheduled_count: int = 0
+    exams: list[AdminExamScheduleRead] = Field(default_factory=list)
 
 
 class SectionTimetableWriteBase(BaseModel):
@@ -239,7 +317,14 @@ class ExamScheduleBase(BaseModel):
     room: str | None = None
     location: str | None = None
     exam_type: str | None = None
+    status: str = "scheduled"
     note: str | None = None
+
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValueError("end_time must be greater than start_time")
+        return self
 
 
 class ExamScheduleCreate(ExamScheduleBase):
@@ -254,7 +339,14 @@ class ExamScheduleUpdate(BaseModel):
     room: str | None = None
     location: str | None = None
     exam_type: str | None = None
+    status: str | None = None
     note: str | None = None
+
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValueError("end_time must be greater than start_time")
+        return self
 
 
 class ExamScheduleRead(ExamScheduleBase):

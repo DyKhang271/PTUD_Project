@@ -7,6 +7,7 @@ const STATUS_LABELS = {
   published: "Published",
   draft: "Draft",
   cancelled: "Cancelled",
+  scheduled: "Scheduled",
   open: "Open",
   closed: "Closed",
   active: "Hoạt động",

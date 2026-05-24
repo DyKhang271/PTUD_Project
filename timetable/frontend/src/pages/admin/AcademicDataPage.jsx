@@ -27,18 +27,18 @@ const initialSyncForm = {
 function buildEmptyReason(result) {
   const debug = result?.debug;
   if (!debug) {
-    return "Khong tim thay lop hoc phan phu hop voi bo loc.";
+    return "Không tìm thấy lớp học phần phù hợp với bộ lọc đã chọn.";
   }
   if (!debug.matched_students_final) {
-    return "Khong co sinh vien nao khop voi nganh va khoa da chon.";
+    return "Không có sinh viên nào khớp với ngành và khóa tuyển đã chọn.";
   }
   if (!debug.transcript_courses_in_term) {
-    return "Khong co mon hoc nao trong hoc ky da chon.";
+    return "Không có môn học nào trong học kỳ đã chọn.";
   }
   if (debug.strict_curriculum_match && !debug.imported_courses_count) {
-    return "Strict mode da loai het mon vi khong trung voi ky tham chieu.";
+    return "Chế độ kiểm tra chặt đã loại toàn bộ môn vì không khớp học kỳ CTĐT tham chiếu.";
   }
-  return "Khong tim thay lop hoc phan phu hop voi bo loc.";
+  return "Không tìm thấy lớp học phần phù hợp với bộ lọc đã chọn.";
 }
 
 export default function AcademicDataPage() {
@@ -147,15 +147,15 @@ export default function AcademicDataPage() {
     const hasValidCohort = !form.cohort || cohortOptions.includes(form.cohort);
 
     if (!hasValidTerm) {
-      setError("Vui long chon hoc ky hop le tu danh sach.");
+      setError("Vui lòng chọn học kỳ hợp lệ từ danh sách.");
       return;
     }
     if (!hasValidProgram) {
-      setError("Vui long chon nganh hop le tu danh sach.");
+      setError("Vui lòng chọn ngành/chương trình hợp lệ từ danh sách.");
       return;
     }
     if (!hasValidCohort) {
-      setError("Khoa da chon khong thuoc nganh hien tai.");
+      setError("Khóa tuyển đã chọn không thuộc ngành/chương trình hiện tại.");
       return;
     }
 
@@ -171,7 +171,7 @@ export default function AcademicDataPage() {
       setShowDebug(data.status === "empty");
       await loadHistory();
     } catch (err) {
-      setError(err?.response?.data?.detail || "Khong the import du lieu hoc vu tu Student Portal.");
+      setError(err?.response?.data?.detail || "Không thể import dữ liệu học vụ từ Student Portal.");
       setResult(null);
       setShowDebug(true);
     } finally {
@@ -183,7 +183,7 @@ export default function AcademicDataPage() {
     event.preventDefault();
     const activeTermCode = result?.term_code || form.term_code;
     if (!activeTermCode) {
-      setSyncError("Can chon hoc ky truoc khi dong bo.");
+      setSyncError("Cần chọn học kỳ trước khi đồng bộ.");
       return;
     }
 
@@ -199,7 +199,7 @@ export default function AcademicDataPage() {
       setSyncResult(data);
       await loadComparisonSilently(activeTermCode);
     } catch (err) {
-      setSyncError(err?.response?.data?.detail || "Khong the dong bo du lieu lop hoc phan tu Student Portal.");
+      setSyncError(err?.response?.data?.detail || "Không thể đồng bộ dữ liệu lớp học phần từ Student Portal.");
       setSyncResult(null);
     } finally {
       setSyncLoading(false);
@@ -239,35 +239,33 @@ export default function AcademicDataPage() {
     };
   });
 
-  if (optionsLoading) {
-    return <LoadingState label="Dang tai cau hinh du lieu hoc vu..." />;
-  }
-
   return (
-    <div className="section-stack">
+    <div className="page-shell">
       <div className="page-header">
-        <h2 className="page-title">Du lieu hoc vu</h2>
-        <p className="page-subtitle">
-          Import, doi soat va dong bo du lieu hoc vu tu Student Portal cho hoc ky thuc te.
-        </p>
+        <div>
+          <h2 className="page-title">Dữ liệu học vụ</h2>
+          <p className="page-subtitle">
+            Dữ liệu học vụ là dữ liệu nền để xác định các lớp học phần cần quản lý trong học kỳ này trước khi xếp lịch học, lịch thi và điểm danh.
+          </p>
+        </div>
       </div>
 
-      <div className="panel section-stack">
+      <div className="data-card section-stack">
         <div className="page-header">
           <div>
-            <h3 className="page-title">Import ban dau</h3>
-            <p className="page-subtitle">Lay danh sach lop hoc phan thuc te theo hoc ky, nganh va khoa.</p>
+            <h3 className="page-title">Import ban đầu</h3>
+            <p className="page-subtitle">Lấy danh sách lớp học phần thực tế theo học kỳ, ngành/chương trình và khóa tuyển.</p>
           </div>
         </div>
 
         <form className="inline-form" onSubmit={handleImport}>
           <label className="field-group">
-            <span>Hoc ky</span>
+            <span>Học kỳ</span>
             <input
               list="academic-data-term-options"
               value={form.term_code}
               onChange={(event) => setForm((current) => ({ ...current, term_code: event.target.value }))}
-              placeholder="Tim va chon hoc ky"
+              placeholder="Tìm và chọn học kỳ"
               required
             />
             <datalist id="academic-data-term-options">
@@ -277,16 +275,16 @@ export default function AcademicDataPage() {
                 </option>
               ))}
             </datalist>
-            {!form.term_code ? <small className="helper-text">Vui long chon hoc ky tu danh sach co du lieu.</small> : null}
+            {!form.term_code ? <small className="helper-text">Chọn học kỳ có dữ liệu để bắt đầu import.</small> : null}
           </label>
 
           <label className="field-group">
-            <span>Nganh</span>
+            <span>Ngành</span>
             <input
               list="academic-data-program-options"
               value={form.program_name}
               onChange={(event) => setForm((current) => ({ ...current, program_name: event.target.value }))}
-              placeholder="Tim va chon nganh"
+              placeholder="Tìm và chọn ngành/chương trình"
               required
             />
             <datalist id="academic-data-program-options">
@@ -297,12 +295,12 @@ export default function AcademicDataPage() {
           </label>
 
           <label className="field-group">
-            <span>Khoa</span>
+            <span>Khóa tuyển</span>
             <input
               list="academic-data-cohort-options"
               value={form.cohort}
               onChange={(event) => setForm((current) => ({ ...current, cohort: event.target.value }))}
-              placeholder={form.program_name ? "Tim va chon khoa" : "Chon nganh truoc"}
+              placeholder={form.program_name ? "Ví dụ: 2023" : "Chọn ngành trước"}
               disabled={!form.program_name}
             />
             <datalist id="academic-data-cohort-options">
@@ -310,35 +308,35 @@ export default function AcademicDataPage() {
                 <option key={cohort} value={cohort} />
               ))}
             </datalist>
-            <small className="helper-text">Optional. Leave empty to import all cohorts in this program.</small>
+            <small className="helper-text">Để trống để import tất cả khóa tuyển trong ngành/chương trình này.</small>
           </label>
 
           <button className="primary-button" type="submit" disabled={loading || !form.term_code || !form.program_name}>
-            {loading ? "Dang import..." : "Import du lieu hoc vu"}
+            {loading ? "Đang import..." : "Import dữ liệu học vụ"}
           </button>
         </form>
 
         <div className="section-stack">
           <button className="link-button" type="button" onClick={() => setShowAdvanced((current) => !current)}>
-            {showAdvanced ? "An tuy chon nang cao" : "Tuy chon nang cao"}
+            {showAdvanced ? "Ẩn tùy chọn nâng cao" : "Ẩn/hiện tùy chọn nâng cao"}
           </button>
           {showAdvanced ? (
             <div className="inline-form">
               <label className="field-group">
-                <span>Reference semester</span>
+                <span>Học kỳ CTĐT tham chiếu</span>
                 <input
                   type="number"
                   min="1"
                   value={form.curriculum_semester}
                   onChange={(event) => setForm((current) => ({ ...current, curriculum_semester: event.target.value }))}
-                  placeholder="Mac dinh 4"
+                  placeholder="Ví dụ: 4"
                 />
                 <small className="helper-text">
-                  Only used for comparison/debug. It does not affect import unless strict mode is enabled.
+                  Dùng để đối chiếu chương trình đào tạo khi import dữ liệu học vụ.
                 </small>
               </label>
               <label className="field-group">
-                <span>Strict mode</span>
+                <span>Chế độ kiểm tra chặt</span>
                 <label className="checkbox-row">
                   <input
                     type="checkbox"
@@ -347,8 +345,11 @@ export default function AcademicDataPage() {
                       setForm((current) => ({ ...current, strict_curriculum_match: event.target.checked }))
                     }
                   />
-                  <span>Strict curriculum semester match</span>
+                  <span>Chỉ import môn khớp đúng học kỳ CTĐT</span>
                 </label>
+                <small className="helper-text">
+                  Nếu bật, hệ thống chỉ import các môn khớp đúng với học kỳ chương trình tham chiếu.
+                </small>
               </label>
             </div>
           ) : null}
@@ -359,70 +360,70 @@ export default function AcademicDataPage() {
 
       {result ? (
         <>
-          {isEmpty ? <div className="state-card state-warning"><strong>{emptyReason}</strong></div> : null}
+          {isEmpty ? <div className="badge warning" style={{ display: "block", width: "100%", padding: "16px", borderRadius: "var(--radius-md)" }}><strong>⚠️ {emptyReason}</strong></div> : null}
           {warnings.length ? (
-            <div className="state-card">
-              <strong>Canh bao import</strong>
+            <div className="badge warning" style={{ display: "block", width: "100%", padding: "16px", borderRadius: "var(--radius-md)" }}>
+              <strong>⚠️ Cảnh báo import</strong>
               {warnings.map((warning) => (
-                <p key={warning}>{warning}</p>
+                <p key={warning} style={{ marginTop: "4px", fontSize: "0.9rem" }}>{warning}</p>
               ))}
             </div>
           ) : null}
 
           <div className="cards-grid">
-            <div className="panel metric-card">
+            <div className="stat-card">
               <h3>{result.status}</h3>
-              <p>Trang thai import</p>
+              <p>Trạng thái import</p>
             </div>
-            <div className="panel metric-card">
+            <div className="stat-card">
               <h3>{result.summary?.sections ?? result.total_sections}</h3>
-              <p>Lop hoc phan import</p>
+              <p>Lớp học phần import</p>
             </div>
-            <div className="panel metric-card">
+            <div className="stat-card">
               <h3>{result.summary?.students ?? result.total_students}</h3>
-              <p>Sinh vien lien ket</p>
+              <p>Sinh viên liên kết</p>
             </div>
-            <div className="panel metric-card">
+            <div className="stat-card">
               <h3>{result.summary?.teachers ?? result.teachers_upserted}</h3>
-              <p>Giang vien dong bo</p>
+              <p>Giảng viên đồng bộ</p>
             </div>
           </div>
         </>
       ) : null}
 
-      <div className="panel section-stack">
+      <div className="data-card section-stack">
         <div className="page-header">
           <div>
-            <h3 className="page-title">Dong bo va doi soat</h3>
+            <h3 className="page-title">Đồng bộ và đối soát</h3>
             <p className="page-subtitle">
-              Dung cho buoc doi soat sau import, bo sung lop hoc phan, cap nhat lien ket va kiem tra trung lap.
+              Dùng cho bước đối soát sau import, bổ sung lớp học phần, cập nhật liên kết và kiểm tra trùng lặp.
             </p>
           </div>
         </div>
 
         <form className="inline-form" onSubmit={handleSync}>
           <label className="field-group">
-            <span>Hoc ky dong bo</span>
+            <span>Học kỳ đồng bộ</span>
             <input value={activeTermCode || ""} readOnly />
           </label>
           <label className="field-group">
-            <span>Class name</span>
+            <span>Lớp hành chính</span>
             <input
               value={syncForm.class_name}
               onChange={(event) => setSyncForm((current) => ({ ...current, class_name: event.target.value }))}
-              placeholder="Loc theo lop"
+              placeholder="Lọc theo lớp hành chính"
             />
           </label>
           <label className="field-group">
-            <span>Student ID</span>
+            <span>Mã sinh viên</span>
             <input
               value={syncForm.student_id}
               onChange={(event) => setSyncForm((current) => ({ ...current, student_id: event.target.value }))}
-              placeholder="Loc theo sinh vien"
+              placeholder="Lọc theo sinh viên"
             />
           </label>
           <label className="field-group">
-            <span>Limit</span>
+            <span>Giới hạn (Limit)</span>
             <input
               type="number"
               min="1"
@@ -431,64 +432,64 @@ export default function AcademicDataPage() {
             />
           </label>
           <button className="secondary-button" type="submit" disabled={syncLoading || !activeTermCode}>
-            {syncLoading ? "Dang dong bo..." : "Dong bo thay doi tu Student Portal"}
+            {syncLoading ? "Đang đồng bộ..." : "Đồng bộ thay đổi từ Student Portal"}
           </button>
         </form>
 
         {syncError ? <ErrorState message={syncError} /> : null}
 
         <div className="cards-grid">
-          <div className="panel metric-card">
+          <div className="stat-card">
             <h3>{comparison?.course_sections_count ?? "--"}</h3>
-            <p>Lop hoc phan dang co trong he thong</p>
+            <p>Lớp học phần đang có trong hệ thống</p>
           </div>
-          <div className="panel metric-card">
+          <div className="stat-card">
             <h3>{comparison?.course_section_students_count ?? "--"}</h3>
-            <p>Lien ket sinh vien hien tai</p>
+            <p>Liên kết sinh viên hiện tại</p>
           </div>
-          <div className="panel metric-card">
+          <div className="stat-card">
             <h3>{comparison?.duplicate_sections?.length ?? 0}</h3>
-            <p>Section trung can xu ly</p>
+            <p>Section trùng cần xử lý</p>
           </div>
-          <div className="panel metric-card">
+          <div className="stat-card">
             <h3>{comparison?.timetable_entries_count ?? "--"}</h3>
-            <p>Ban ghi lich hoc hien co</p>
+            <p>Bản ghi lịch học hiện có</p>
           </div>
         </div>
 
         {syncResult ? (
-          <div className="state-card state-success">
-            <strong>Ket qua dong bo</strong>
-            <p>
-              Section moi: {syncResult.sections_created} | Section cap nhat: {syncResult.sections_updated} | Sinh vien lien ket:{" "}
+          <div className="badge success" style={{ display: "block", width: "100%", padding: "16px", borderRadius: "var(--radius-md)", textAlign: "left" }}>
+            <strong>✅ Kết quả đồng bộ thành công</strong>
+            <p style={{ marginTop: "4px", fontSize: "0.95rem" }}>
+              Section mới: {syncResult.sections_created} | Section cập nhật: {syncResult.sections_updated} | Sinh viên liên kết:{" "}
               {syncResult.students_linked ?? syncResult.linked_students}
             </p>
-            {syncResult.warnings?.length ? <p>Canh bao: {syncResult.warnings.join(" | ")}</p> : null}
+            {syncResult.warnings?.length ? <p style={{ marginTop: "4px", fontSize: "0.9rem", color: "var(--warning)" }}>Cảnh báo: {syncResult.warnings.join(" | ")}</p> : null}
           </div>
         ) : null}
 
-        {comparisonLoading ? <LoadingState label="Dang tong hop doi soat du lieu..." /> : null}
+        {comparisonLoading ? <LoadingState label="Đang tổng hợp đối soát dữ liệu..." /> : null}
       </div>
 
-      <div className="table-card">
-        <div className="page-header">
+      <div className="data-card">
+        <div className="page-header" style={{ marginBottom: "16px" }}>
           <div>
-            <h3 className="page-title">Bang chenh lech van hanh</h3>
+            <h3 className="page-title">Bảng chênh lệch vận hành</h3>
             <p className="page-subtitle">
-              Theo doi nhanh cac lop vua import, section trung lap, thieu giang vien va cac canh bao dong bo.
+              Theo dõi nhanh các lớp vừa import, section trùng lặp, thiếu giảng viên và các cảnh báo đồng bộ.
             </p>
           </div>
         </div>
 
         {sectionDiffRows.length ? (
-          <table>
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Section</th>
-                <th>Mon hoc</th>
-                <th>Giang vien</th>
-                <th>Sinh vien</th>
-                <th>Canh bao</th>
+                <th>Môn học</th>
+                <th>Giảng viên</th>
+                <th>Sinh viên</th>
+                <th>Cảnh báo</th>
               </tr>
             </thead>
             <tbody>
@@ -501,18 +502,26 @@ export default function AcademicDataPage() {
                   </td>
                   <td>{row.teacher_full_name || row.teacher_external_id || "--"}</td>
                   <td>{row.student_count}</td>
-                  <td>{row.issues.length ? row.issues.join(" | ") : "Khong"}</td>
+                  <td>
+                    {row.issues.length ? (
+                      row.issues.map((issue) => (
+                        <span key={issue} className="badge danger" style={{ marginRight: "4px", fontSize: "0.75rem", padding: "4px 8px" }}>{issue}</span>
+                      ))
+                    ) : (
+                      <span className="badge success" style={{ fontSize: "0.75rem", padding: "4px 8px" }}>Không</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : comparison?.duplicate_sections?.length ? (
-          <table>
+          <table className="data-table">
             <thead>
               <tr>
                 <th>Section code</th>
-                <th>Van de</th>
-                <th>So ban ghi</th>
+                <th>Vấn đề</th>
+                <th>Số bản ghi</th>
               </tr>
             </thead>
             <tbody>
@@ -526,31 +535,31 @@ export default function AcademicDataPage() {
             </tbody>
           </table>
         ) : (
-          <EmptyState message="Chua co bang doi soat de hien thi." />
+          <EmptyState message="Chưa có bảng đối soát để hiển thị." />
         )}
       </div>
 
-      <div className="table-card">
-        <div className="page-header">
+      <div className="data-card">
+        <div className="page-header" style={{ marginBottom: "16px" }}>
           <div>
-            <h3 className="page-title">Lich su import va cong cu nang cao</h3>
-            <p className="page-subtitle">Theo doi cac lan import gan day va truy cap workflow mo lop nang cao khi can.</p>
+            <h3 className="page-title">Lịch sử import và công cụ nâng cao</h3>
+            <p className="page-subtitle">Theo dõi các lần import gần đây và truy cập workflow mở lớp nâng cao khi cần.</p>
           </div>
           <Link className="secondary-button" to="/admin/academic-data/advanced/plan">
-            Mo cong cu ke hoach mo lop
+            Mở công cụ kế hoạch mở lớp
           </Link>
         </div>
 
         {historyLoading ? (
-          <LoadingState label="Dang tai lich su import..." />
+          <LoadingState label="Đang tải lịch sử import..." />
         ) : history.length ? (
-          <table>
+          <table className="data-table">
             <thead>
               <tr>
-                <th>Thoi gian</th>
-                <th>Hoc ky</th>
-                <th>Nganh</th>
-                <th>Trang thai</th>
+                <th>Thời gian</th>
+                <th>Học kỳ</th>
+                <th>Ngành</th>
+                <th>Trạng thái</th>
                 <th>Sections</th>
                 <th>Warnings</th>
               </tr>
@@ -561,7 +570,9 @@ export default function AcademicDataPage() {
                   <td>{item.imported_at}</td>
                   <td>{item.term_code}</td>
                   <td>{item.program_name || "--"}</td>
-                  <td>{item.status}</td>
+                  <td>
+                    <span className={`status-badge status-${item.status}`}>{item.status}</span>
+                  </td>
                   <td>{item.section_count}</td>
                   <td>{item.warnings?.length ? item.warnings.join(" | ") : "--"}</td>
                 </tr>
@@ -569,47 +580,47 @@ export default function AcademicDataPage() {
             </tbody>
           </table>
         ) : (
-          <EmptyState message="Chua co lich su import hoc vu." />
+          <EmptyState message="Chưa có lịch sử import học vụ." />
         )}
       </div>
 
       {debug ? (
         <div className="section-stack">
           <button className="link-button" type="button" onClick={() => setShowDebug((current) => !current)}>
-            {showDebug ? "An technical debug" : "Show technical debug"}
+            {showDebug ? "Ẩn technical debug" : "Hiện technical debug"}
           </button>
           {showDebug ? (
-            <div className="table-card">
-              <div className="cards-grid">
-                <div className="panel metric-card">
+            <div className="data-card" style={{ marginTop: "12px" }}>
+              <div className="cards-grid" style={{ marginBottom: "20px" }}>
+                <div className="stat-card">
                   <h3>{debug.matched_students_by_program}</h3>
                   <p>Sinh vien khop nganh</p>
                 </div>
-                <div className="panel metric-card">
+                <div className="stat-card">
                   <h3>{debug.matched_students_by_cohort}</h3>
                   <p>Sinh vien khop khoa</p>
                 </div>
-                <div className="panel metric-card">
+                <div className="stat-card">
                   <h3>{debug.transcript_courses_in_term}</h3>
                   <p>Mon trong hoc ky</p>
                 </div>
-                <div className="panel metric-card">
+                <div className="stat-card">
                   <h3>{debug.imported_courses_count}</h3>
                   <p>Mon da import</p>
                 </div>
               </div>
-              <div className="section-stack">
+              <div className="section-stack" style={{ gap: "16px" }}>
                 <div>
                   <strong>Mon trung CTDT tham chieu</strong>
-                  <p>{debug.overlap_course_codes?.length ? debug.overlap_course_codes.join("; ") : "--"}</p>
+                  <p style={{ color: "var(--text-secondary)", marginTop: "4px" }}>{debug.overlap_course_codes?.length ? debug.overlap_course_codes.join("; ") : "--"}</p>
                 </div>
                 <div>
                   <strong>Mon co trong transcript nhung khong thuoc ky tham chieu</strong>
-                  <p>{debug.transcript_only_course_codes?.length ? debug.transcript_only_course_codes.join("; ") : "--"}</p>
+                  <p style={{ color: "var(--text-secondary)", marginTop: "4px" }}>{debug.transcript_only_course_codes?.length ? debug.transcript_only_course_codes.join("; ") : "--"}</p>
                 </div>
                 <div>
                   <strong>Mon thuoc ky tham chieu nhung khong co trong transcript</strong>
-                  <p>{debug.curriculum_only_course_codes?.length ? debug.curriculum_only_course_codes.join("; ") : "--"}</p>
+                  <p style={{ color: "var(--text-secondary)", marginTop: "4px" }}>{debug.curriculum_only_course_codes?.length ? debug.curriculum_only_course_codes.join("; ") : "--"}</p>
                 </div>
               </div>
             </div>
