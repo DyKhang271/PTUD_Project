@@ -13,6 +13,9 @@ class StudentContext:
     failed_courses: list[str]
     credit_progress_exact: bool
     curriculum_note: str | None
+    total_required_credits: int | None
+    mandatory_credits: int | None
+    elective_credits: int | None
 
 
 def _format_course_names(courses: list[dict], *, only_failed: bool = False) -> list[str]:
@@ -64,6 +67,8 @@ def build_student_context(student_bundle: dict | None) -> StudentContext | None:
     current_term_payload = transcript_terms[-1] if transcript_terms else {}
     raw_curriculum_summary = raw_payload.get("curriculum_summary") or {}
     total_required_credits = raw_curriculum_summary.get("total_required_credits")
+    mandatory_credits = raw_curriculum_summary.get("mandatory_credits")
+    elective_credits = raw_curriculum_summary.get("elective_credits")
     completed_credits = latest_completed.get("earned_credits")
     in_progress_credits = _compute_in_progress_credits(raw_payload, current_term, current_term_payload)
     credit_progress_exact = total_required_credits is not None and completed_credits is not None
@@ -102,6 +107,10 @@ def build_student_context(student_bundle: dict | None) -> StudentContext | None:
     ]
     if credit_progress_exact:
         summary_lines.append(f"Tong tin chi chuong trinh: {total_required_credits}")
+        if mandatory_credits is not None:
+            summary_lines.append(f"Tin chi bat buoc: {mandatory_credits}")
+        if elective_credits is not None:
+            summary_lines.append(f"Tin chi tu chon: {elective_credits}")
         summary_lines.append(f"Tin chi con lai de hoan thanh chuong trinh: {remaining_credits}")
     else:
         summary_lines.append("Tong tin chi chuong trinh: chua co du lieu chinh xac trong he thong.")
@@ -124,4 +133,7 @@ def build_student_context(student_bundle: dict | None) -> StudentContext | None:
         failed_courses=failed_courses,
         credit_progress_exact=credit_progress_exact,
         curriculum_note=raw_curriculum_summary.get("note"),
+        total_required_credits=total_required_credits,
+        mandatory_credits=mandatory_credits,
+        elective_credits=elective_credits,
     )

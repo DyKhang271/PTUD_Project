@@ -96,7 +96,7 @@ def student_login(data: StudentLogin):
     if student:
         external_id = str(student.get("mssv") or data.mssv)
         return _success_response(role="student", profile_key="student", profile=student, external_id=external_id)
-    return {"success": False, "message": "MÃ£ sá»‘ sinh viÃªn hoáº·c máº­t kháº©u khÃ´ng Ä‘Ãºng."}
+    return {"success": False, "message": "Mã số sinh viên hoặc mật khẩu không đúng."}
 
 
 @router.post("/parent-login")
@@ -118,7 +118,7 @@ def parent_login(data: ParentLogin):
         }
     return {
         "success": False,
-        "message": "ThÃ´ng tin xÃ¡c thá»±c khÃ´ng chÃ­nh xÃ¡c. Vui lÃ²ng kiá»ƒm tra láº¡i.",
+        "message": "Thông tin xác thực không chính xác. Vui lòng kiểm tra lại.",
     }
 
 
@@ -130,7 +130,7 @@ def admin_login(data: AdminLogin):
         return _success_response(role="admin", profile_key="admin", profile=profile, external_id=data.username)
     return {
         "success": False,
-        "message": "TÃ i khoáº£n hoáº·c máº­t kháº©u quáº£n trá»‹ khÃ´ng Ä‘Ãºng.",
+        "message": "Tài khoản hoặc mật khẩu quản trị không đúng.",
     }
 
 
@@ -141,7 +141,7 @@ def teacher_login(data: TeacherLogin):
         return _success_response(role="teacher", profile_key="teacher", profile=teacher, external_id=data.username)
     return {
         "success": False,
-        "message": "TÃ i khoáº£n hoáº·c máº­t kháº©u giáº£ng viÃªn khÃ´ng Ä‘Ãºng.",
+        "message": "Tài khoản hoặc mật khẩu giảng viên không đúng.",
     }
 
 

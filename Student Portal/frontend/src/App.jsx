@@ -34,7 +34,6 @@ function ProtectedRoute() {
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
-  const { isParent } = useAuth();
 
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
     return localStorage.getItem('theme') === 'dark';

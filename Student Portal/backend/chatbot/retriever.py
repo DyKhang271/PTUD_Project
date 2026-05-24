@@ -45,18 +45,34 @@ def _score_chunk(
     program_code: str | None,
     course_specific: bool,
 ) -> int:
-    chunk_tokens = set(normalize_text(chunk.text).split())
+    normalized_chunk = normalize_text(chunk.text)
+    chunk_tokens = set(normalized_chunk.split())
     overlap = len(tokens & chunk_tokens)
     score = overlap
 
     if intent == "chuong_trinh_khung" and chunk.category == "curriculum":
         score += 4
+        if "tong tc yeu cau" in normalized_chunk or "tong tin chi" in normalized_chunk:
+            score += 8
     if intent in {"quy_che_hoc_vu", "bao_luu_nghi_hoc", "xet_tot_nghiep", "dang_ky_hoc_phan"} and chunk.category == "policy":
         score += 4
+    if intent == "quy_che_hoc_vu" and {"canh", "bao"} <= tokens and "canh bao hoc vu" in normalized_chunk:
+        score += 14
+    if intent == "quy_che_hoc_vu" and {"canh", "cao"} <= tokens and "canh bao hoc vu" in normalized_chunk:
+        score += 14
+    if intent == "xet_tot_nghiep" and {"tot", "nghiep"} <= tokens and "xet tot nghiep" in normalized_chunk:
+        score += 12
     if intent == "dang_ky_hoc_phan" and course_specific and chunk.category == "curriculum":
         score += 7
     if intent == "dang_ky_hoc_phan" and {"tien", "quyet"} <= tokens and chunk.category == "curriculum":
         score += 5
+    if intent == "dang_ky_hoc_phan" and chunk.category == "policy":
+        if "hoc phan tien quyet" in normalized_chunk:
+            score += 12
+        if "hoc phan hoc truoc" in normalized_chunk:
+            score += 10
+        if "hoc phan song hanh" in normalized_chunk:
+            score += 10
     if program_code and chunk.program_code == program_code:
         score += 5
     return score

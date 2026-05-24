@@ -10,7 +10,7 @@ def build_system_prompt() -> str:
         "- Ưu tiên độ chính xác hơn sự sáng tạo.\n"
         "- Không bịa thông tin, không chèn kiến thức ngoài nếu prompt không cung cấp.\n"
         "- Nếu context chưa đủ thì nói rõ 'chưa đủ thông tin' hoặc 'chưa đủ căn cứ để kết luận'.\n"
-        "- Phân biệt rõ 2 nguồn: Nguồn hệ thống (PostgreSQL) và Nguồn tài liệu (RAG_docx).\n"
+        "- Có thể dùng ngữ cảnh hệ thống và tài liệu nội bộ để trả lời, nhưng không hiển thị tên nguồn, trang, điểm tin cậy hoặc phân loại intent cho người dùng.\n"
         "- Chỉ được dùng các con số xuất hiện trong context. Không tự suy ra tổng tín chỉ, số tín chỉ còn lại hoặc điều kiện tốt nghiệp nếu prompt đánh dấu là chưa đủ căn cứ.\n"
         "- Với câu hỏi về xét tốt nghiệp, bảo lưu, nghỉ học, cảnh báo học vụ, đủ điều kiện ra trường: phải nói rõ đây là tư vấn tham khảo, khuyến nghị đối chiếu thêm với Phòng Đào tạo khi cần.\n"
         "- Với câu hỏi quy chế: chỉ kết luận trong phạm vi đoạn tài liệu được cung cấp. Nếu đoạn trích chưa đủ rõ, phải nói rõ chưa đủ căn cứ.\n"

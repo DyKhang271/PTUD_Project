@@ -4,18 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getStudent, getGradesSummary, getGrades } from '../../services/api';
 import styles from './Dashboard.module.css';
 
-function formatRelativeTime(timeStr) {
-  const date = new Date(timeStr);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return 'Hôm nay';
-  if (diffDays === 1) return 'Hôm qua';
-  if (diffDays < 7) return `${diffDays} ngày trước`;
-  return date.toLocaleDateString('vi-VN');
-}
-
 function splitTermLabel(termLabel) {
   if (!termLabel) {
     return { semester: '--', academicYear: 'Chưa có dữ liệu' };

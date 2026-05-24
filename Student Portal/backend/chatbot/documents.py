@@ -21,7 +21,8 @@ class DocumentChunk:
 
 
 def normalize_text(value: str) -> str:
-    normalized = unicodedata.normalize("NFKD", value or "")
+    value = (value or "").replace("đ", "d").replace("Đ", "D")
+    normalized = unicodedata.normalize("NFKD", value)
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9\s]", " ", ascii_text.lower())
 

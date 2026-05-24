@@ -33,7 +33,7 @@ from app.schemas.import_schema import (
     TimetableEntriesCsvImportResponse,
     TimetableEntriesImportResponse,
 )
-from app.services.core_api_client import CoreApiClient, normalize_student_payload
+from app.services.core_api_client import CoreApiClient, normalize_student_payload, normalize_teacher_payload
 
 
 DEFAULT_FACULTY = "Khoa Công nghệ Thông tin"
@@ -295,12 +295,15 @@ def _upsert_section(
     teacher_external_id: str | None = None,
 ) -> tuple[CourseSection, bool]:
     section = _get_section_by_term_and_code(db, term_id=term_id, section_code=section_code)
+    resolved_teacher_external_id = teacher_external_id
+    if section is not None and not resolved_teacher_external_id:
+        resolved_teacher_external_id = section.teacher_external_id
     values = {
         "term_id": term_id,
         "course_code": course_code,
         "course_name": course_name,
         "section_code": section_code,
-        "teacher_external_id": teacher_external_id,
+        "teacher_external_id": resolved_teacher_external_id,
         "faculty": faculty or DEFAULT_FACULTY,
         "program_name": program_name,
         "total_sessions": 15,
@@ -598,6 +601,9 @@ def _get_course_source_items(
             "course_name": str(item.get("course_name") or "").strip(),
             "student_ids": base_student_ids,
             "teacher_id": item.get("teacher_id"),
+            "teacher_name": item.get("teacher_name"),
+            "teacher_email": item.get("teacher_email"),
+            "teacher_department": item.get("teacher_department"),
         }
         if current is None:
             merged[section_code] = normalized_item
@@ -613,12 +619,18 @@ def _get_course_source_items(
             current["course_code"] = normalized_item["course_code"]
         if not current.get("teacher_id") and normalized_item.get("teacher_id"):
             current["teacher_id"] = normalized_item.get("teacher_id")
+        for teacher_key in ("teacher_name", "teacher_email", "teacher_department"):
+            if not current.get(teacher_key) and normalized_item.get(teacher_key):
+                current[teacher_key] = normalized_item.get(teacher_key)
 
     if student_ids:
         for student_id in student_ids:
             payload = client.get_course_sections_source(term=term, student_id=student_id, limit=100)
             for item in _extract_items(payload, "items"):
                 add_item(item)
+        payload = client.get_course_sections_source(term=term, limit=100)
+        for item in _extract_items(payload, "items"):
+            add_item(item)
     else:
         payload = client.get_course_sections_source(term=term, limit=100)
         for item in _extract_items(payload, "items"):
@@ -636,6 +648,9 @@ def _get_course_source_items(
                 "course_name": fallback["course_name"],
                 "student_ids": fallback_student_ids.copy(),
                 "teacher_id": None,
+                "teacher_name": None,
+                "teacher_email": None,
+                "teacher_department": None,
             }
         else:
             current_ids = set(merged[section_code].get("student_ids") or [])
@@ -736,6 +751,26 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
                 errors.append(f"Skipped invalid course source item '{section_code or 'unknown'}'")
                 continue
 
+            teacher_external_id = None
+            raw_teacher_id = str(item.get("teacher_id") or "").strip()
+            if raw_teacher_id:
+                try:
+                    teacher_payload = client.get_teacher(raw_teacher_id)
+                    teacher = normalize_teacher_payload(teacher_payload)
+                    teacher_external_id = teacher["teacher_external_id"] or raw_teacher_id
+                    external_user_repo.upsert_external_user(
+                        db,
+                        external_user_id=teacher_external_id,
+                        role="teacher",
+                        full_name=teacher.get("full_name") or item.get("teacher_name"),
+                        email=teacher.get("email") or item.get("teacher_email"),
+                        faculty=teacher.get("faculty") or item.get("teacher_department"),
+                    )
+                except HTTPException as exc:
+                    if exc.status_code != status.HTTP_404_NOT_FOUND:
+                        raise
+                    errors.append(f"Teacher '{raw_teacher_id}' could not be loaded from Student Portal")
+
             linked_ids = _extract_ids(item.get("student_ids") or [])
             if requested_student_ids:
                 requested_set = set(student_profiles.keys()) or set(requested_student_ids)
@@ -758,7 +793,7 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
                 course_name=course_name,
                 faculty=derived_faculty,
                 program_name=derived_program_name,
-                teacher_external_id=None,
+                teacher_external_id=teacher_external_id,
             )
             section_lookup[section_code] = section
             if created_section:

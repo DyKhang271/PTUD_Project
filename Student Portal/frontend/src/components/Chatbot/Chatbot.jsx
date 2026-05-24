@@ -19,9 +19,9 @@ const SUGGESTIONS = [
     color: "var(--success)"
   },
   {
-    label: "Chương trình đào tạo",
-    text: "Chương trình khung ngành của tôi là gì?",
-    icon: "📋",
+    label: "Điều kiện học phần",
+    text: "Học phần tiên quyết, học trước và song hành khác nhau thế nào?",
+    icon: "🔗",
     bg: "rgba(139, 92, 246, 0.15)",
     color: "#8b5cf6"
   },
@@ -67,9 +67,11 @@ export default function Chatbot() {
 
   // Filter out any default WELCOME messages from legacy data
   useEffect(() => {
-    if (messages.length > 0 && messages[0].text.includes('Xin chào! Mình là trợ lý học vụ AI')) {
-        setMessages(messages.slice(1));
-    }
+    setMessages((currentMessages) => (
+      currentMessages.length > 0 && currentMessages[0].text.includes('Xin chào! Mình là trợ lý học vụ AI')
+        ? currentMessages.slice(1)
+        : currentMessages
+    ));
   }, []);
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export default function Chatbot() {
   }, [messages, isTyping]);
 
   const role = user?.role || 'student';
-  const studentId = user?.mssv || null;
+  const studentId = user?.mssv || user?.student_id || user?.id || user?.external_id || null;
   const programName = user?.program_name || user?.nganh || user?.chuyen_nganh || null;
 
   const handleSendText = async (textToSend) => {
@@ -160,8 +162,6 @@ export default function Chatbot() {
         {
           type: 'bot',
           text: res.data.reply,
-          sources: res.data.sources || [],
-          intent: res.data.intent,
         },
       ]);
     } catch {
@@ -170,7 +170,6 @@ export default function Chatbot() {
         {
           type: 'bot',
           text: 'Xin lỗi, hệ thống máy chủ AI đang gặp quá tải hoặc bảo trì. Vui lòng thử lại sau giây lát.',
-          sources: [],
         },
       ]);
     } finally {
@@ -190,22 +189,6 @@ export default function Chatbot() {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const renderSources = (sources) => {
-    if (!sources || sources.length === 0) return null;
-    return (
-      <div className={styles.sourcesContainer}>
-        <div className={styles.sourcesTitle}>Nguồn tham khảo:</div>
-        <ul className={styles.sourcesList}>
-          {sources.map((src, idx) => (
-            <li key={idx} className={styles.sourceItem}>
-              {src.file_id || 'Tài liệu'} (Trang {src.page || '?'}) - Độ tin cậy: {Math.round((src.score || 0) * 100)}%
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
   };
 
   return (
@@ -278,8 +261,6 @@ export default function Chatbot() {
                   )}
                   <div className={styles.messageContent}>
                     <div className={styles.messageText}>{msg.text}</div>
-                    {msg.intent && <div className={styles.intentBadge}>Phân loại: {msg.intent}</div>}
-                    {msg.type === 'bot' && renderSources(msg.sources)}
                   </div>
                 </div>
               ))}

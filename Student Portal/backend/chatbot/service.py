@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import re
 
 from .db_retriever import CourseLookupResult, fetch_student_bundle, find_course_lookup, looks_like_student_academic_query
 from .documents import normalize_text
@@ -104,6 +105,9 @@ INTENT_RULES = {
             "quy dinh hoc vu",
             "dieu kien hoc vu",
             "canh bao hoc vu",
+            "canh bao",
+            "canh cao hoc vu",
+            "canh cao",
             "buoc thoi hoc",
             "hoc lai",
             "thi lai",
@@ -114,10 +118,12 @@ INTENT_RULES = {
             "quy che",
             "quy dinh",
             "dieu kien canh bao",
+            "dieu kien canh cao",
         ),
         "combo_groups": (
             (("quy",), ("che",)),
             (("quy",), ("dinh",)),
+            (("canh",), ("bao", "cao")),
             (("hoc",), ("lai",)),
             (("thi",), ("lai",)),
             (("cai",), ("thien",), ("diem",)),
@@ -179,6 +185,12 @@ INTENT_RULES = {
             "dang ki lai",
             "dang ky tin chi",
             "dang ki tin chi",
+            "hoc phan tien quyet",
+            "hoc phan hoc truoc",
+            "hoc phan song hanh",
+            "mon tien quyet",
+            "hoc truoc",
+            "song hanh",
             "co duoc dang ky",
             "co duoc dang ki",
         ),
@@ -192,6 +204,9 @@ INTENT_RULES = {
         "combo_groups": (
             (("dang",), ("ky", "ki"), ("hoc", "phan", "mon", "tin", "chi")),
             (("rut", "huy", "mo"), ("hoc", "phan", "mon", "lop")),
+            (("tien",), ("quyet",)),
+            (("hoc",), ("truoc",)),
+            (("song",), ("hanh",)),
         ),
         "priority": 60,
     },
@@ -369,8 +384,43 @@ def _contains_course_credit_query(normalized: str) -> bool:
 
 def _should_use_direct_course_lookup(intent: str, message: str) -> bool:
     normalized = normalize_text(message)
-    if intent in {"dang_ky_hoc_phan", "chuong_trinh_khung"}:
+    if intent in {
+        "dang_ky_hoc_phan",
+        "chuong_trinh_khung",
+        "gpa_tin_chi",
+        "xet_tot_nghiep",
+        "quy_che_hoc_vu",
+        "bao_luu_nghi_hoc",
+    }:
         return False
+    if _contains_any(
+        normalized,
+        (
+            "tot nghiep",
+            "ra truong",
+            "tien do hoc tap",
+            "tin chi con lai",
+            "con bao nhieu tin chi",
+            "da dat bao nhieu tin chi",
+            "da hoan thanh bao nhieu tin chi",
+            "gpa",
+            "diem trung binh",
+        ),
+    ):
+        return False
+    course_targeted = any(
+        phrase in normalized
+        for phrase in (
+            "diem mon",
+            "diem cua mon",
+            "mon ",
+            "hoc phan",
+            "hoc mon",
+            "qua mon",
+            "rot mon",
+            "dat mon",
+        )
+    )
     return any(
         checker(normalized)
         for checker in (
@@ -379,7 +429,7 @@ def _should_use_direct_course_lookup(intent: str, message: str) -> bool:
             _contains_course_term_query,
             _contains_course_credit_query,
         )
-    )
+    ) and course_targeted
 
 
 def _describe_course_status(attempt: dict) -> str:
@@ -483,7 +533,7 @@ def _format_document_context(snippets: list[RetrievedSnippet]) -> str:
 
 def _format_sources(sources: list[str]) -> str:
     if not sources:
-        return "Không có nguồn tham khảo."
+        return "Không có nguồn nội bộ."
     return "; ".join(sources)
 
 
@@ -509,10 +559,13 @@ def _response_contract(intent: str, student_context: StudentContext | None, has_
         )
 
     if has_documents:
-        instructions.append("7. Nếu có dùng tài liệu, hãy nói rõ tài liệu nào đang làm căn cứ.")
+        instructions.append("7. Nếu có dùng tài liệu, chỉ trả lời nội dung chính; không liệt kê tên file, trang, điểm tin cậy hoặc nguồn tham khảo.")
 
     instructions.append(
-        "8. Nếu câu hỏi vượt quá dữ liệu hiện có, hãy nói rõ 'chưa đủ căn cứ để kết luận' thay vì đoán."
+        "8. Không hiển thị phân loại intent, nguồn tham khảo, tên file/trang nguồn hoặc độ tin cậy trong câu trả lời."
+    )
+    instructions.append(
+        "9. Nếu câu hỏi vượt quá dữ liệu hiện có, hãy nói rõ 'chưa đủ căn cứ để kết luận' thay vì đoán."
     )
     return "\n".join(instructions)
 
@@ -566,16 +619,130 @@ def _fallback_for_student(intent: str, student_context: StudentContext) -> str:
             )
 
     if intent == "chuong_trinh_khung":
+        credit_parts = []
+        if student_context.total_required_credits is not None:
+            credit_parts.append(f"tổng {student_context.total_required_credits} tín chỉ")
+        if student_context.mandatory_credits is not None:
+            credit_parts.append(f"{student_context.mandatory_credits} tín chỉ bắt buộc")
+        if student_context.elective_credits is not None:
+            credit_parts.append(f"{student_context.elective_credits} tín chỉ tự chọn")
+
+        progress = ""
+        if student_context.credit_progress_exact:
+            progress = (
+                f" Hiện bạn đã đạt {metrics.get('tc_dat')} tín chỉ, đang học {metrics.get('tc_dang_hoc')} tín chỉ "
+                f"và còn {metrics.get('tc_con_lai')} tín chỉ để hoàn thành theo dữ liệu hệ thống."
+            )
+
+        note = f" Ghi chú: {student_context.curriculum_note}." if student_context.curriculum_note else ""
+        credit_summary = ", gồm " + ", ".join(credit_parts) if credit_parts else ""
         return (
-            f"Bạn thuộc ngành {student_context.program_name}. Mình sẽ ưu tiên đối chiếu chương trình khung đúng với ngành này."
+            f"Theo dữ liệu hệ thống, bạn thuộc ngành {student_context.program_name or 'chưa xác định'} "
+            f"và chương trình khung hiện ghi nhận{credit_summary}.{progress}{note}"
         )
 
     return student_context.summary_text
 
 
-def _fallback_from_documents(intent: str, snippets: list[RetrievedSnippet]) -> str:
+def _compact_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _relevant_document_points(message: str, snippets: list[RetrievedSnippet], *, limit: int = 4) -> list[str]:
+    question_tokens = {token for token in normalize_text(message).split() if len(token) > 2}
+    scored: list[tuple[int, int, str]] = []
+    position = 0
+
+    for snippet in snippets:
+        for raw_part in re.split(r"\n+|(?<=[.!?])\s+", snippet.text):
+            part = _compact_text(raw_part)
+            if len(part) < 30:
+                continue
+            normalized_part = normalize_text(part)
+            part_tokens = set(normalized_part.split())
+            score = len(question_tokens & part_tokens)
+            if "canh bao hoc vu" in normalized_part:
+                score += 8
+            if "hoc phan tien quyet" in normalized_part:
+                score += 8
+            if "hoc phan hoc truoc" in normalized_part or "hoc phan song hanh" in normalized_part:
+                score += 6
+            if "xet tot nghiep" in normalized_part:
+                score += 8
+            if score > 0:
+                scored.append((score, position, part))
+            position += 1
+
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    selected = sorted(scored[:limit], key=lambda item: item[1])
+    return [item[2] for item in selected]
+
+
+def _policy_warning_reply() -> str:
+    return (
+        "Theo quy chế học vụ hệ thống đang có, sinh viên có thể bị cảnh báo học vụ khi rơi vào một trong các trường hợp sau:\n"
+        "- GPA học kỳ dưới 0.80 ở học kỳ đầu hoặc dưới 1.00 ở các học kỳ tiếp theo.\n"
+        "- CPA/điểm trung bình tích lũy thấp hơn mức quy định theo năm đào tạo.\n"
+        "- Số tín chỉ không đạt trong học kỳ vượt quá 50% khối lượng đăng ký, hoặc nợ đọng quá 24 tín chỉ từ đầu khóa.\n"
+        "- Nếu bị cảnh báo học vụ quá 2 lần liên tiếp thì có thể bị buộc thôi học.\n\n"
+        "Đây là tư vấn tham khảo; khi cần quyết định chính thức, bạn nên đối chiếu thêm với Phòng Đào tạo."
+    )
+
+
+def _course_condition_reply() -> str:
+    return (
+        "Ba loại điều kiện học phần khác nhau như sau:\n"
+        "- Học phần tiên quyết: phải thi đậu học phần A thì mới được đăng ký học phần B.\n"
+        "- Học phần học trước: phải học xong học phần A trước khi đăng ký học phần B; có thể chưa đạt nhưng phải có quá trình học/điểm.\n"
+        "- Học phần song hành: được đăng ký học phần A và B trong cùng một học kỳ.\n\n"
+        "Khi đăng ký học phần, bạn nên kiểm tra kỹ điều kiện tiên quyết/học trước của từng môn và kết quả học tập hiện tại của mình."
+    )
+
+
+def _graduation_policy_reply(student_context: StudentContext | None) -> str:
+    if student_context:
+        metrics = student_context.compact_metrics
+        progress = (
+            f"Theo dữ liệu hệ thống, bạn đã đạt {metrics.get('tc_dat')}/{metrics.get('tc_tong')} tín chỉ, "
+            f"đang học {metrics.get('tc_dang_hoc')} tín chỉ và còn {metrics.get('tc_con_lai')} tín chỉ."
+            if student_context.credit_progress_exact
+            else "Hệ thống chưa đủ dữ liệu tổng tín chỉ để kết luận chính xác tiến độ tốt nghiệp của bạn."
+        )
+        return (
+            f"{progress}\n\n"
+            "Về nguyên tắc xét tốt nghiệp, sinh viên cần tích lũy đủ số tín chỉ của chương trình, đạt CPA từ 2.0/4.0 trở lên và có đủ các chứng chỉ/điều kiện bắt buộc như GDQP, GDTC, ngoại ngữ nếu chương trình yêu cầu. "
+            "Đây là tư vấn tham khảo; bạn nên đối chiếu thêm với Phòng Đào tạo khi cần xác nhận chính thức."
+        )
+    return (
+        "Về nguyên tắc xét tốt nghiệp, sinh viên cần tích lũy đủ số tín chỉ của chương trình, đạt CPA từ 2.0/4.0 trở lên và có đủ các chứng chỉ/điều kiện bắt buộc như GDQP, GDTC, ngoại ngữ nếu chương trình yêu cầu."
+    )
+
+
+def _fallback_from_documents(
+    intent: str,
+    snippets: list[RetrievedSnippet],
+    *,
+    message: str,
+    student_context: StudentContext | None = None,
+) -> str:
     if not snippets:
         return ""
+
+    normalized_message = normalize_text(message)
+    normalized_tokens = set(normalized_message.split())
+    if intent == "quy_che_hoc_vu" and (
+        {"canh", "bao"} <= normalized_tokens or {"canh", "cao"} <= normalized_tokens
+    ):
+        return _policy_warning_reply()
+    if intent == "dang_ky_hoc_phan" and (
+        "tien quyet" in normalized_message
+        or "hoc truoc" in normalized_message
+        or "song hanh" in normalized_message
+        or "dang ky hoc phan" in normalized_message
+    ):
+        return _course_condition_reply()
+    if intent == "xet_tot_nghiep":
+        return _graduation_policy_reply(student_context)
 
     primary = snippets[0]
     if intent in {"chuong_trinh_khung", "dang_ky_hoc_phan"}:
@@ -592,20 +759,20 @@ def _fallback_from_documents(intent: str, snippets: list[RetrievedSnippet]) -> s
         "chuong_trinh_khung": "Theo tài liệu chương trình khung mà hệ thống đang có,",
     }.get(intent, "Theo tài liệu tham khảo mà hệ thống đang có,")
 
-    excerpt = primary.text[:500].strip()
+    points = _relevant_document_points(message, snippets)
+    excerpt = "\n".join(f"- {point}" for point in points) if points else _compact_text(primary.text[:500])
     if intent in SENSITIVE_INTENTS:
         return (
             f"{lead}\n\n{excerpt}\n\n"
-            f"Đây là tư vấn tham khảo dựa trên đoạn trích từ {primary.source}. "
+            "Đây là tư vấn tham khảo dựa trên dữ liệu học vụ hệ thống đang có. "
             "Nếu bạn cần kết luận chính thức, nên đối chiếu thêm với Phòng Đào tạo."
         )
     if intent == "dang_ky_hoc_phan":
         return (
             f"{lead}\n\n{excerpt}\n\n"
-            f"Nguồn tham khảo gần nhất: {primary.source}. "
             "Nếu bạn muốn biết có được đăng ký ngay hay không, mình sẽ cần đối chiếu thêm học phần tiên quyết/học trước và kết quả học tập hiện tại của bạn."
         )
-    return f"{lead}\n\n{excerpt}\n\nNguồn tham khảo gần nhất: {primary.source}."
+    return f"{lead}\n\n{excerpt}"
 
 
 def _fallback_response(
@@ -613,6 +780,7 @@ def _fallback_response(
     intent: str,
     student_context: StudentContext | None,
     snippets: list[RetrievedSnippet],
+    message: str,
     ollama_reason: str | None,
 ) -> str:
     if intent == "chao_hoi":
@@ -621,17 +789,18 @@ def _fallback_response(
             "Bạn có thể hỏi mình về GPA, tín chỉ, bảng điểm, chương trình khung, quy chế học vụ hoặc tiến độ tốt nghiệp."
         )
 
+    if intent == "chuong_trinh_khung" and student_context:
+        return _fallback_for_student(intent, student_context)
+
     if intent in DOCUMENT_FIRST_FALLBACK_INTENTS and snippets:
-        return _fallback_from_documents(intent, snippets)
+        return _fallback_from_documents(intent, snippets, message=message, student_context=student_context)
 
     if student_context and intent != "ngoai_pham_vi":
         base = _fallback_for_student(intent, student_context)
-        if snippets:
-            return f"{base}\n\nNguồn tài liệu tham khảo gần nhất: {snippets[0].source}."
         return base
 
     if snippets:
-        return _fallback_from_documents(intent, snippets)
+        return _fallback_from_documents(intent, snippets, message=message, student_context=student_context)
 
     return (
         "Mình chưa đủ thông tin để trả lời chắc chắn câu hỏi này. "
@@ -651,8 +820,8 @@ def _build_prompt(
 ) -> str:
     sections = [
         f"Vai trò người dùng: {role or 'unknown'}",
-        f"Intent dự kiến: {intent}",
-        "Danh sách nguồn được phép sử dụng:\n" + _format_sources(sources),
+        f"Intent nội bộ, không hiển thị cho người dùng: {intent}",
+        "Nguồn nội bộ để đối chiếu, không hiển thị cho người dùng:\n" + _format_sources(sources),
         "Lịch sử hội thoại gần đây:\n" + _format_history(session_id),
     ]
 
@@ -669,7 +838,7 @@ def _build_prompt(
     sections.append("Hướng dẫn trả lời:\n" + _response_contract(intent, student_context, bool(document_snippets)))
     sections.append("Câu hỏi hiện tại:\n" + message.strip())
     sections.append(
-        "Hãy trả lời bằng tiếng Việt có dấu, ngắn gọn, rõ ràng. Nếu thông tin chưa đủ thì nói rõ là chưa đủ thông tin hoặc chưa đủ căn cứ để kết luận."
+        "Hãy trả lời bằng tiếng Việt có dấu, ngắn gọn, rõ ràng. Nếu thông tin chưa đủ thì nói rõ là chưa đủ thông tin hoặc chưa đủ căn cứ để kết luận. Không thêm phân loại intent, nguồn tham khảo, tên file/trang nguồn hoặc độ tin cậy vào câu trả lời."
     )
     return "\n\n".join(sections)
 
@@ -759,6 +928,7 @@ class ChatbotService:
                 intent=intent,
                 student_context=student_context,
                 snippets=document_snippets,
+                message=message,
                 ollama_reason=ollama_reason,
             )
 

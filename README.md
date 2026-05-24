@@ -1,186 +1,319 @@
 # IUH Student Portal + Timetable
 
-Repository nay gom 2 he thong chay cung nhau de mo phong cong thong tin hoc vu va quan ly thoi khoa bieu:
+Project gồm 2 hệ thống chạy cùng nhau bằng Docker Compose:
 
-- **Student Portal**: cong thong tin sinh vien/giao vien/phu huynh, cung cap dashboard, diem, chuong trinh khung, thong bao, chatbot AI va API noi bo cho module khac.
-- **Timetable**: he thong thoi khoa bieu va diem danh, su dung JWT do Student Portal cap va dong bo du lieu hoc phan/sinh vien/giao vien tu Student Portal.
+- **Student Portal**: cổng thông tin sinh viên/giảng viên/phụ huynh/quản trị, quản lý điểm, chương trình đào tạo, thông báo và chatbot học vụ.
+- **Timetable**: hệ thống thời khóa biểu, lịch thi và điểm danh. Timetable dùng tài khoản/JWT do Student Portal cấp và đồng bộ dữ liệu sinh viên, học phần, giảng viên từ Student Portal.
 
-## Tong quan he thong
+Hướng dẫn này ưu tiên cách chạy bằng Docker để có thể chạy lại trên laptop/máy tính mới mà không cần cài riêng Python, Node.js hay PostgreSQL.
 
-### Student Portal
+## 1. Yêu cầu máy
 
-- **Backend** (`Student Portal/backend`): FastAPI, xu ly dang nhap, diem, chuong trinh khung, chatbot, API noi bo cho Timetable.
-- **Frontend** (`Student Portal/frontend`): React + Vite, giao dien cho sinh vien, giao vien, quan tri va phu huynh.
-- **Database** (`Student Portal/database`): PostgreSQL, luu du lieu runtime va schema khoi tao.
-- **Muc dich**: lam he thong trung tam cho tai khoan, du lieu hoc vu va chatbot.
+Cài trước:
 
-### Timetable
+- **Git**
+- **Docker Desktop** hoặc Docker Engine có Compose plugin
+- **curl**
 
-- **Backend** (`timetable/app`): FastAPI + SQLAlchemy + Alembic, quan ly hoc ky, hoc phan, lich hoc, diem danh.
-- **Frontend** (`timetable/frontend`): React + Vite, giao dien xem thoi khoa bieu va quan tri import du lieu.
-- **Database** (`timetable` + Postgres): luu hoc ky, course section, timetable entries, attendance sessions/records.
-- **Muc dich**: cung cap module thoi khoa bieu/doc lap nhung van lien thong voi Student Portal.
+Khuyến nghị:
 
-## Yeu cau moi truong
+- RAM tối thiểu 8 GB, khuyến nghị 16 GB nếu bật Ollama/chatbot AI.
+- Còn trống ít nhất 8-10 GB ổ đĩa cho image, volume và dependency.
+- Docker Desktop phải đang chạy trước khi chạy lệnh.
 
-- Git
-- Docker
-- Docker Compose (`docker compose`)
-- RAM khuyen nghi:
-  - Toi thieu: 8 GB
-  - Khuyen nghi: 16 GB neu chay them Ollama/model lon
-- Cac port can trong:
-  - `5432` - Student Portal PostgreSQL
-  - `5433` - Timetable PostgreSQL
-  - `8000` - Student Portal API
-  - `8001` - Timetable API
-  - `8080` - Student Portal frontend
-  - `5174` - Timetable frontend
-  - `11434` - Ollama API neu dung AI
+Các port cần trống:
 
-## Huong dan cai dat va chay du an
+| Port | Dịch vụ |
+| --- | --- |
+| `8080` | Student Portal frontend |
+| `8000` | Student Portal API |
+| `5174` | Timetable frontend |
+| `8001` | Timetable API |
+| `5432` | Student Portal PostgreSQL |
+| `5433` | Timetable PostgreSQL |
+| `11434` | Ollama API |
 
-Repository da duoc bo sung `docker-compose.yml` o thu muc goc va script setup de giang vien co the clone repo va chay ngay.
+Nếu máy đang có PostgreSQL, Node dev server hoặc app khác chiếm các port trên, hãy tắt app đó hoặc đổi port trong `docker-compose.yml`.
 
-### 1. Clone repository
+## 2. Clone project
 
 ```bash
 git clone <repo-url>
-cd PTUD_Project_c38355d
+cd PTUD_Project
 ```
 
-### 2. Chay script tu dong
+Nếu thư mục sau khi clone có tên khác, chỉ cần `cd` vào đúng thư mục chứa file `docker-compose.yml`.
 
-#### Linux / macOS
+Không đổi tên các thư mục con như `Student Portal` hoặc `timetable` vì Docker Compose đang tham chiếu đúng các đường dẫn này.
+
+## 3. Cách chạy nhanh
+
+### Windows
+
+Mở PowerShell hoặc Command Prompt tại thư mục gốc project:
+
+```bat
+setup.bat
+```
+
+### macOS / Linux
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-#### Windows
+Script sẽ tự kiểm tra Docker, build image, chạy database, backend, frontend, migrate Timetable DB và seed dữ liệu demo.
 
-```bat
-setup.bat
+## 4. Cách chạy thủ công bằng Docker Compose
+
+Nếu không dùng script:
+
+```bash
+docker compose up -d --build
 ```
 
-### 3. Script se tu dong lam gi
+Xem trạng thái container:
 
-- kiem tra Docker va Docker Compose
-- build toan bo container
-- khoi dong 2 database
-- khoi dong Student Portal backend/frontend
-- khoi dong Timetable backend/frontend
-- chay Alembic migration cho Timetable
-- khoi tao/seed du lieu Student Portal vao PostgreSQL khi DB rong
-- tu dong seed du lieu demo cho Timetable tu Student Portal, kem sample timetable va attendance
+```bash
+docker compose ps
+```
 
-Sau khi script chay xong, website co the truy cap ngay tren may local.
+Xem log khi có lỗi:
 
-## URL sau khi chay
+```bash
+docker compose logs -f
+```
 
-- Student Portal frontend: [http://localhost:8080](http://localhost:8080)
-- Student Portal API: [http://localhost:8000](http://localhost:8000)
-- Timetable frontend: [http://localhost:5174](http://localhost:5174)
-- Timetable API: [http://localhost:8001](http://localhost:8001)
-- Ollama API: [http://localhost:11434](http://localhost:11434)
+Xem log riêng backend:
 
-## Tai khoan test
+```bash
+docker compose logs -f backend
+docker compose logs -f timetable-backend
+```
 
-Timetable dang dung cung tai khoan/JWT voi Student Portal, vi vay co the dang nhap bang cung credential ben duoi.
+## 5. URL sau khi chạy
 
-| Role | Username/Email | Password | Mo ta quyen |
+| Hệ thống | URL |
+| --- | --- |
+| Student Portal | http://localhost:8080 |
+| Student Portal API | http://localhost:8000 |
+| Timetable | http://localhost:5174 |
+| Timetable API | http://localhost:8001 |
+| Ollama | http://localhost:11434 |
+
+Nên đợi `docker compose ps` hiển thị các service chính ở trạng thái `healthy` trước khi test.
+
+## 6. Tài khoản demo
+
+Timetable dùng chung tài khoản đăng nhập với Student Portal.
+
+| Vai trò | Tài khoản | Mật khẩu | Ghi chú |
 | --- | --- | --- | --- |
-| Admin | `admin` | `admin` | Quan tri Student Portal, co the vao trang admin va seed/import du lieu cho Timetable |
-| Teacher | `gvungdung` | `gvungdung` | Giao vien bo mon Phat trien ung dung, xem du lieu giang day va diem danh |
-| Teacher | `gvaiml` | `gvaiml` | Giao vien bo mon AI/ML, xem du lieu giang day va diem danh |
-| Student | `23630781` | `23630781` | Tai khoan sinh vien demo, xem dashboard, diem, chuong trinh khung, timetable |
-| Student | `23630761` | `23630761` | Tai khoan sinh vien demo thu hai, dung de doi chieu du lieu |
+| Admin | `admin` | `admin` | Quản trị Student Portal và Timetable |
+| Giảng viên | `gvungdung` | `gvungdung` | Có lớp học phần được phân công |
+| Giảng viên | `gvaiml` | `gvaiml` | Có lớp học phần được phân công |
+| Sinh viên | `23630781` | `23630781` | Sinh viên demo |
+| Sinh viên | `23630761` | `23630761` | Sinh viên demo |
 
-Du lieu tren duoc lay tu source hien co:
+Thông tin phụ huynh dùng tab đăng nhập phụ huynh ở Student Portal:
 
-- `Student Portal/backend/student_data_store.py`
-- `Student Portal/backend/routers/auth.py`
-- `timetable/app/services/auth_service.py`
+| MSSV | Ngày sinh | SĐT |
+| --- | --- | --- |
+| `23630781` | `04/09/2005` | `0912360781` |
+| `23630761` | `12/03/2005` | `0912360761` |
 
-## Dung he thong
+## 7. Seed dữ liệu demo
 
-Chay tai thu muc goc repository:
+Service `bootstrap-demo` tự chạy sau khi `backend` và `timetable-backend` healthy. Service này:
+
+- đăng nhập bằng tài khoản admin của Student Portal;
+- lấy học kỳ mới nhất từ dữ liệu Student Portal;
+- seed course sections, sinh viên, giảng viên, lịch học mẫu và điểm danh mẫu vào Timetable.
+
+Kiểm tra log seed:
+
+```bash
+docker compose logs bootstrap-demo
+```
+
+Chạy lại seed nếu cần:
+
+```bash
+docker compose up -d --force-recreate bootstrap-demo
+```
+
+## 8. Dừng, rebuild, reset dữ liệu
+
+Dừng toàn bộ container:
 
 ```bash
 docker compose down
 ```
 
-## Reset du lieu
+Rebuild và chạy lại:
 
-Lenh duoi day se xoa ca 2 volume Postgres, khoi tao lai DB va tu dong seed lai du lieu demo nho service bootstrap:
+```bash
+docker compose up -d --build
+```
+
+Reset sạch database và seed lại từ đầu:
 
 ```bash
 docker compose down -v
-docker compose up --build
-```
-
-Neu muon chay nen, co the dung:
-
-```bash
 docker compose up -d --build
 ```
 
-## Luu y khi chay AI / Ollama
+Lưu ý: `docker compose down -v` sẽ xóa dữ liệu trong các volume PostgreSQL và Ollama của project.
 
-Mac dinh compose se khoi dong them service `ollama` de Student Portal chatbot co the goi LLM.
+## 9. Chạy không cần AI/Ollama
 
-### Neu model qua lon
-
-Trong `docker-compose.yml`, bien `OLLAMA_MODEL` dang de `gemma4:31b-cloud`. Neu may khong du tai nguyen, co the doi sang model nhe hon, vi du:
-
-- `llama3.2:3b`
-- `qwen2.5:3b`
-
-Sau do chay lai:
-
-```bash
-docker compose up -d --build
-```
-
-### Neu chua co model
-
-Sau khi he thong da len, pull model bang lenh:
-
-```bash
-docker compose exec ollama ollama pull gemma4:31b-cloud
-```
-
-Neu dung model nhe hon, thay ten model tuong ung:
-
-```bash
-docker compose exec ollama ollama pull llama3.2:3b
-```
-
-### Neu khong can AI
-
-Backend Student Portal co fallback an toan khi Ollama khong san sang. Co the bo qua service AI bang cach chi chay cac service can thiet:
+Mặc định Compose có service `ollama` để phục vụ chatbot AI. Nếu máy yếu hoặc không cần chatbot AI, có thể chạy các service chính:
 
 ```bash
 docker compose up -d --build postgres backend frontend timetable-postgres timetable-backend timetable-frontend bootstrap-demo
 ```
 
-Khi do chatbot van mo duoc, nhung phan LLM se fallback thay vi goi model.
+Chatbot vẫn có fallback theo dữ liệu hệ thống/RAG tùy câu hỏi, nhưng phần gọi model Ollama có thể không hoạt động nếu Ollama/model chưa sẵn sàng.
 
-## Ghi chu van hanh
+Nếu muốn dùng Ollama đầy đủ, pull model sau khi container lên:
 
-- `docker-compose.yml` o root da cau hinh lai `depends_on`, `healthcheck`, secret/env va ket noi giua 2 he thong de `docker compose up --build` chay on dinh.
-- Student Portal su dung `INTERNAL_API_KEY=dev-internal-secret`.
-- Timetable su dung `CORE_API_KEY=dev-internal-secret` de goi API noi bo cua Student Portal.
-- JWT secret dang duoc dong bo qua `PORTAL_JWT_SECRET=student-portal-dev-secret`.
-- Timetable backend duoc migrate bang `alembic upgrade head` moi lan container khoi dong.
-- Service `bootstrap-demo` tu dong login bang tai khoan admin va seed du lieu Timetable cho 2 sinh vien demo.
+```bash
+docker compose exec ollama ollama pull gemma4:31b-cloud
+```
 
-## Chay tung module de debug
+Nếu máy không đủ tài nguyên cho model lớn, đổi `OLLAMA_MODEL` trong `docker-compose.yml` sang model nhẹ hơn, ví dụ:
 
-Neu can debug rieng tung module, cac file compose cu van con trong:
+- `llama3.2:3b`
+- `qwen2.5:3b`
 
-- `Student Portal/docker-compose.yml`
-- `timetable/docker-compose.yml`
+Sau đó chạy lại:
 
-Tuy nhien, de demo cho giang vien, nen uu tien chay bang `docker-compose.yml` o thu muc goc hoac `setup.sh` / `setup.bat`.
+```bash
+docker compose up -d --build
+```
+
+## 10. Kiểm tra nhanh sau khi chạy
+
+```bash
+docker compose ps
+docker compose logs --tail=80 bootstrap-demo
+```
+
+Test nhanh trên trình duyệt:
+
+1. Mở Student Portal: http://localhost:8080
+2. Đăng nhập sinh viên `23630781 / 23630781`
+3. Mở Timetable: http://localhost:5174
+4. Đăng nhập giảng viên `gvungdung / gvungdung`
+5. Kiểm tra trang lớp học phần/điểm danh của giảng viên.
+
+## 11. Cấu trúc project
+
+```text
+PTUD_Project/
+├─ docker-compose.yml              # Compose chạy full hệ thống
+├─ setup.bat                       # Script chạy nhanh trên Windows
+├─ setup.sh                        # Script chạy nhanh trên macOS/Linux
+├─ bootstrap_demo.py               # Seed dữ liệu demo Timetable từ Student Portal
+├─ Student Portal/
+│  ├─ backend/                     # FastAPI Student Portal
+│  ├─ frontend/                    # React/Vite Student Portal
+│  ├─ database/                    # Schema PostgreSQL
+│  ├─ data_json/                   # Dữ liệu sinh viên demo
+│  └─ RAG_docx/                    # Tài liệu RAG cho chatbot
+└─ timetable/
+   ├─ app/                         # FastAPI Timetable
+   ├─ frontend/                    # React/Vite Timetable
+   ├─ alembic/                     # Migration Timetable DB
+   └─ docs/                        # Tài liệu API/contract
+```
+
+## 12. Lệnh build/test thường dùng
+
+Student Portal frontend:
+
+```bash
+cd "Student Portal/frontend"
+npm run lint
+npm run build
+```
+
+Student Portal backend:
+
+```bash
+cd "Student Portal"
+python -m compileall backend
+```
+
+Timetable frontend trong Docker:
+
+```bash
+docker compose exec -T timetable-frontend npm run build
+```
+
+Timetable backend:
+
+```bash
+cd timetable
+python -m compileall app
+```
+
+## 13. Lỗi thường gặp
+
+### Docker daemon is not running
+
+Mở Docker Desktop, chờ Docker báo running rồi chạy lại `setup.bat`, `setup.sh` hoặc `docker compose up -d --build`.
+
+### Port already allocated
+
+Một ứng dụng khác đang chiếm port. Kiểm tra và tắt ứng dụng đó, hoặc đổi mapping port trong `docker-compose.yml`.
+
+Ví dụ đổi Student Portal frontend từ `8080` sang `8088`:
+
+```yaml
+ports:
+  - "8088:80"
+```
+
+### Timetable frontend lâu lên ở lần đầu
+
+Container `timetable-frontend` chạy `npm ci` ở lần đầu nên có thể mất vài phút. Xem log:
+
+```bash
+docker compose logs -f timetable-frontend
+```
+
+### Chatbot trả lời chậm hoặc lỗi model
+
+Kiểm tra Ollama:
+
+```bash
+docker compose ps ollama
+docker compose logs -f ollama
+```
+
+Nếu chưa pull model:
+
+```bash
+docker compose exec ollama ollama pull gemma4:31b-cloud
+```
+
+### Muốn làm sạch hoàn toàn để chạy lại từ đầu
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+## 14. Ghi chú môi trường
+
+Các biến quan trọng đã được cấu hình sẵn trong `docker-compose.yml`:
+
+- `DATABASE_URL` cho Student Portal PostgreSQL và Timetable PostgreSQL.
+- `INTERNAL_API_KEY=dev-internal-secret` ở Student Portal.
+- `CORE_API_KEY=dev-internal-secret` ở Timetable để gọi API nội bộ của Student Portal.
+- `PORTAL_JWT_SECRET=student-portal-dev-secret` dùng chung để xác thực JWT.
+- `RAG_DOCUMENTS_DIR=/rag_docs` để mount tài liệu `.docx` cho chatbot.
+
+Với mục đích demo/local development, chỉ cần Docker Compose ở thư mục gốc là đủ.
