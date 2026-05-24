@@ -25,8 +25,13 @@ export async function updateTerm(termId, payload) {
   return data;
 }
 
-export async function fetchCourseSections() {
-  const { data } = await api.get("/admin/course-sections");
+export async function fetchCourseSections(params = {}) {
+  const { data } = await api.get("/admin/course-sections", { params });
+  return data;
+}
+
+export async function fetchCourseSubjects(params = {}) {
+  const { data } = await api.get("/admin/course-subjects", { params });
   return data;
 }
 
@@ -55,9 +60,13 @@ export async function importCourseSections(payload) {
   return data;
 }
 
-export async function fetchTimetableEntries(sectionId) {
-  const params = sectionId ? { section_id: sectionId } : {};
+export async function fetchTimetableEntries(params = {}) {
   const { data } = await api.get("/admin/timetable", { params });
+  return data;
+}
+
+export async function fetchTimetableCourseGroups(params = {}) {
+  const { data } = await api.get("/admin/timetable/course-groups", { params });
   return data;
 }
 

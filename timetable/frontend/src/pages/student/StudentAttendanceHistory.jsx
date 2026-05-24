@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import StatusBadge from "../../components/StatusBadge";
 import { fetchStudentAttendanceHistory } from "../../services/studentApi";
@@ -6,7 +7,7 @@ import { fetchStudentAttendanceHistory } from "../../services/studentApi";
 const statuses = [
   { value: "all", label: "Tất cả" },
   { value: "present", label: "Có mặt" },
-  { value: "late", label: "Đi muộn" },
+  { value: "late", label: "Đi trễ" },
   { value: "absent", label: "Vắng" },
   { value: "excused", label: "Có phép" },
   { value: "unknown", label: "Chưa ghi nhận" },
@@ -69,12 +70,12 @@ export default function StudentAttendanceHistory() {
       </div>
 
       <div className="cards-grid">
-        <div className="panel metric-card"><h3>{totals.total}</h3><p>Total sessions</p></div>
-        <div className="panel metric-card"><h3>{totals.present}</h3><p>Present</p></div>
-        <div className="panel metric-card"><h3>{totals.late}</h3><p>Late</p></div>
-        <div className="panel metric-card"><h3>{totals.absent}</h3><p>Absent</p></div>
-        <div className="panel metric-card"><h3>{totals.excused}</h3><p>Excused</p></div>
-        <div className="panel metric-card"><h3>{totals.rate}%</h3><p>Attendance rate</p></div>
+        <div className="panel metric-card"><h3>{totals.total}</h3><p>Tổng số buổi</p></div>
+        <div className="panel metric-card"><h3>{totals.present}</h3><p>Có mặt</p></div>
+        <div className="panel metric-card"><h3>{totals.late}</h3><p>Đi trễ</p></div>
+        <div className="panel metric-card"><h3>{totals.absent}</h3><p>Vắng</p></div>
+        <div className="panel metric-card"><h3>{totals.excused}</h3><p>Có phép</p></div>
+        <div className="panel metric-card"><h3>{totals.rate}%</h3><p>Tỷ lệ chuyên cần</p></div>
       </div>
 
       <div className="panel plan-filter-grid">
@@ -105,11 +106,11 @@ export default function StudentAttendanceHistory() {
           <table className="interactive-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Course</th>
-                <th>Teacher</th>
-                <th>Status</th>
-                <th>Note</th>
+                <th>Ngày</th>
+                <th>Môn học</th>
+                <th>Giảng viên</th>
+                <th>Trạng thái</th>
+                <th>Ghi chú</th>
               </tr>
             </thead>
             <tbody>
@@ -145,13 +146,13 @@ export default function StudentAttendanceHistory() {
               <button className="secondary-button" onClick={() => setSelected(null)} type="button">Đóng</button>
             </div>
             <div className="plan-context-grid">
-              <div><strong>Course</strong><div>{selected.course_name}</div></div>
+              <div><strong>Môn học</strong><div>{selected.course_name}</div></div>
               <div><strong>Section</strong><div>{selected.section_code}</div></div>
-              <div><strong>Teacher</strong><div>{selected.teacher_name || "--"}</div></div>
-              <div><strong>Datetime</strong><div>{dateText(selected)}</div></div>
-              <div><strong>Status</strong><div><StatusBadge status={selected.status || "unknown"} /></div></div>
-              <div><strong>Teacher note</strong><div>{selected.note || "--"}</div></div>
-              <div><strong>Updated at</strong><div>{selected.updated_at ? new Date(selected.updated_at).toLocaleString("vi-VN") : "--"}</div></div>
+              <div><strong>Giảng viên</strong><div>{selected.teacher_name || "--"}</div></div>
+              <div><strong>Ngày giờ</strong><div>{dateText(selected)}</div></div>
+              <div><strong>Trạng thái</strong><div><StatusBadge status={selected.status || "unknown"} /></div></div>
+              <div><strong>Ghi chú</strong><div>{selected.note || "--"}</div></div>
+              <div><strong>Cập nhật lúc</strong><div>{selected.updated_at ? new Date(selected.updated_at).toLocaleString("vi-VN") : "--"}</div></div>
             </div>
           </div>
         </div>

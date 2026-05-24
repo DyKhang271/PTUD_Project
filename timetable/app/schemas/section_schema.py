@@ -15,6 +15,7 @@ class CourseSectionBase(BaseModel):
     section_code: str
     teacher_external_id: str | None = None
     faculty: str | None = None
+    program_name: str | None = None
     student_count: int = 0
     total_sessions: int | None = None
     status: str = "active"
@@ -31,6 +32,7 @@ class CourseSectionUpdate(BaseModel):
     section_code: str | None = None
     teacher_external_id: str | None = None
     faculty: str | None = None
+    program_name: str | None = None
     student_count: int | None = None
     total_sessions: int | None = None
     status: str | None = None
@@ -42,6 +44,22 @@ class CourseSectionRead(CourseSectionBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    teacher_name: str | None = None
+    term_code: str | None = None
+    term_name: str | None = None
+
+
+class CourseSubjectSummaryRead(BaseModel):
+    course_id: str
+    course_code: str
+    course_name: str
+    term_id: UUID | None = None
+    term_code: str | None = None
+    term_name: str | None = None
+    faculty: str | None = None
+    program_name: str | None = None
+    section_count: int = 0
+    scheduled_count: int = 0
 
 
 class CourseSectionInspectRead(CourseSectionRead):

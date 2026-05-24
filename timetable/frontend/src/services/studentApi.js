@@ -1,7 +1,7 @@
 import { api } from "./api";
 
-export async function fetchStudentTimetable() {
-  const { data } = await api.get("/student/timetable");
+export async function fetchStudentTimetable(params = {}) {
+  const { data } = await api.get("/student/timetable", { params });
   return data;
 }
 

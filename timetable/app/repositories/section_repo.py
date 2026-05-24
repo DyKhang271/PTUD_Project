@@ -52,6 +52,10 @@ def list_sections(
     term_id: UUID | None = None,
     teacher_external_id: str | None = None,
     student_external_id: str | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+    course_code: str | None = None,
+    status: str | None = None,
 ) -> list[CourseSection]:
     stmt = select(CourseSection).options(joinedload(CourseSection.term))
     if term_id:
@@ -63,6 +67,14 @@ def list_sections(
             CourseSectionStudent.student_external_id == student_external_id,
             CourseSectionStudent.enrollment_status == "active",
         )
+    if faculty:
+        stmt = stmt.where(CourseSection.faculty == faculty)
+    if program_name:
+        stmt = stmt.where(CourseSection.program_name == program_name)
+    if course_code:
+        stmt = stmt.where(CourseSection.course_code == course_code)
+    if status:
+        stmt = stmt.where(CourseSection.status == status)
     stmt = stmt.order_by(CourseSection.course_code, CourseSection.section_code)
     return list(db.scalars(stmt).unique().all())
 

@@ -18,25 +18,34 @@ const initialForm = {
   section_code: "",
   teacher_external_id: "",
   faculty: "",
+  program_name: "",
   status: "active",
 };
 
 export default function CourseSectionManagement() {
   const [state, setState] = useState({ loading: true, error: "", sections: [], terms: [] });
-  const [filters, setFilters] = useState({ search: "", term_id: "", status: "" });
+  const [filters, setFilters] = useState({ search: "", term_id: "", faculty: "", program: "", status: "" });
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState("");
 
-  async function load() {
-    setState({ loading: true, error: "", sections: [], terms: [] });
+  async function load(activeFilters = filters) {
+    setState((prev) => ({ ...prev, loading: true, error: "" }));
     try {
-      const [sections, terms] = await Promise.all([fetchCourseSections(), fetchTerms()]);
+      const [sections, terms] = await Promise.all([
+        fetchCourseSections({
+          term_id: activeFilters.term_id || undefined,
+          faculty: activeFilters.faculty || undefined,
+          program: activeFilters.program || undefined,
+          status: activeFilters.status || undefined,
+        }),
+        fetchTerms(),
+      ]);
       setState({ loading: false, error: "", sections, terms });
     } catch (err) {
       setState({
         loading: false,
-        error: err?.response?.data?.detail || "Khong tai duoc danh sach lop hoc phan.",
+        error: err?.response?.data?.detail || "Không tải được danh sách lớp học phần.",
         sections: [],
         terms: [],
       });
@@ -44,34 +53,42 @@ export default function CourseSectionManagement() {
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    load(filters);
+  }, [filters.term_id, filters.faculty, filters.program, filters.status]);
+
+  const facultyOptions = useMemo(
+    () => [...new Set(state.sections.map((section) => section.faculty).filter(Boolean))].sort(),
+    [state.sections],
+  );
+
+  const programOptions = useMemo(() => {
+    return [...new Set(
+      state.sections
+        .filter((section) => !filters.faculty || section.faculty === filters.faculty)
+        .map((section) => section.program_name)
+        .filter(Boolean),
+    )].sort();
+  }, [filters.faculty, state.sections]);
 
   const filteredSections = useMemo(() => {
     const search = filters.search.trim().toLowerCase();
     return state.sections.filter((section) => {
-      if (filters.term_id && section.term_id !== filters.term_id) {
-        return false;
-      }
-      if (filters.status && section.status !== filters.status) {
-        return false;
-      }
-      if (!search) {
-        return true;
-      }
-      const haystack = [
+      if (!search) return true;
+      return [
         section.course_code,
         section.course_name,
         section.section_code,
         section.teacher_external_id,
+        section.teacher_name,
         section.faculty,
+        section.program_name,
       ]
         .filter(Boolean)
         .join(" ")
-        .toLowerCase();
-      return haystack.includes(search);
+        .toLowerCase()
+        .includes(search);
     });
-  }, [filters, state.sections]);
+  }, [filters.search, state.sections]);
 
   function beginEdit(section) {
     setForm({
@@ -82,6 +99,7 @@ export default function CourseSectionManagement() {
       section_code: section.section_code || "",
       teacher_external_id: section.teacher_external_id || "",
       faculty: section.faculty || "",
+      program_name: section.program_name || "",
       status: section.status || "active",
     });
     setFeedback("");
@@ -103,6 +121,7 @@ export default function CourseSectionManagement() {
         section_code: form.section_code,
         teacher_external_id: form.teacher_external_id || null,
         faculty: form.faculty || null,
+        program_name: form.program_name || null,
         status: form.status || "active",
       };
 
@@ -111,16 +130,16 @@ export default function CourseSectionManagement() {
         if (form.teacher_external_id) {
           await assignSectionTeacher(form.id, form.teacher_external_id);
         }
-        setFeedback("Da cap nhat lop hoc phan.");
+        setFeedback("Đã cập nhật lớp học phần.");
       } else {
         await createCourseSection(payload);
-        setFeedback("Da tao lop hoc phan moi.");
+        setFeedback("Đã tạo lớp học phần mới.");
       }
 
       resetForm();
-      await load();
+      await load(filters);
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "Khong the luu lop hoc phan.");
+      setFeedback(err?.response?.data?.detail || "Không thể lưu lớp học phần.");
     } finally {
       setSubmitting(false);
     }
@@ -130,91 +149,97 @@ export default function CourseSectionManagement() {
     setFeedback("");
     try {
       await archiveCourseSection(section.id, nextStatus);
-      if (form.id === section.id) {
-        setForm((current) => ({ ...current, status: nextStatus }));
-      }
-      await load();
+      await load(filters);
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "Khong the cap nhat trang thai lop hoc phan.");
+      setFeedback(err?.response?.data?.detail || "Không thể cập nhật trạng thái lớp học phần.");
     }
   }
 
-  if (state.loading) return <LoadingState label="Dang tai module lop hoc phan..." />;
-  if (state.error) return <ErrorState message={state.error} onRetry={load} />;
+  if (state.loading) return <LoadingState label="Đang tải module lớp học phần..." />;
+  if (state.error) return <ErrorState message={state.error} onRetry={() => load(filters)} />;
 
   return (
     <div className="section-stack">
       <div className="page-header">
-        <h2 className="page-title">Quan ly lop hoc phan</h2>
-        <p className="page-subtitle">
-          Module nay chi dung de quan ly cac section da ton tai: tao tay, chinh sua, gan giang vien va doi trang thai.
-        </p>
+        <h2 className="page-title">Quản lý lớp học phần</h2>
+        <p className="page-subtitle">Tổ chức lớp học phần theo khoa, chương trình và học kỳ để admin không phải lọc thủ công toàn hệ thống.</p>
       </div>
 
-      <form className="panel inline-form" onSubmit={handleSubmit}>
-        <label className="field-group">
-          <span>Hoc ky</span>
-          <select value={form.term_id} onChange={(event) => setForm((prev) => ({ ...prev, term_id: event.target.value }))}>
-            <option value="">Chua gan hoc ky</option>
-            {state.terms.map((term) => (
-              <option key={term.id} value={term.id}>
-                {term.term_code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field-group">
-          <span>Ma mon</span>
-          <input value={form.course_code} onChange={(event) => setForm((prev) => ({ ...prev, course_code: event.target.value }))} />
-        </label>
-        <label className="field-group">
-          <span>Ten mon</span>
-          <input value={form.course_name} onChange={(event) => setForm((prev) => ({ ...prev, course_name: event.target.value }))} />
-        </label>
-        <label className="field-group">
-          <span>Section code</span>
-          <input value={form.section_code} onChange={(event) => setForm((prev) => ({ ...prev, section_code: event.target.value }))} />
-        </label>
-        <label className="field-group">
-          <span>Teacher ID</span>
-          <input
-            value={form.teacher_external_id}
-            onChange={(event) => setForm((prev) => ({ ...prev, teacher_external_id: event.target.value }))}
-          />
-        </label>
-        <label className="field-group">
-          <span>Trang thai</span>
-          <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}>
-            <option value="active">active</option>
-            <option value="inactive">inactive</option>
-            <option value="archived">archived</option>
-          </select>
-        </label>
-        <button className="primary-button" type="submit" disabled={submitting}>
-          {submitting ? "Dang luu..." : form.id ? "Cap nhat lop hoc phan" : "Tao lop hoc phan"}
-        </button>
-        {form.id ? (
-          <button className="secondary-button" type="button" onClick={resetForm}>
-            Huy sua
+      <form className="panel form-grid" onSubmit={handleSubmit}>
+        <div className="inline-form">
+          <label className="field-group">
+            <span>Học kỳ</span>
+            <select value={form.term_id} onChange={(event) => setForm((prev) => ({ ...prev, term_id: event.target.value }))}>
+              <option value="">Chưa gán học kỳ</option>
+              {state.terms.map((term) => (
+                <option key={term.id} value={term.id}>
+                  {term.term_code}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field-group">
+            <span>Khoa</span>
+            <input value={form.faculty} onChange={(event) => setForm((prev) => ({ ...prev, faculty: event.target.value }))} />
+          </label>
+          <label className="field-group">
+            <span>Ngành / Chương trình</span>
+            <input value={form.program_name} onChange={(event) => setForm((prev) => ({ ...prev, program_name: event.target.value }))} />
+          </label>
+          <label className="field-group">
+            <span>Teacher ID</span>
+            <input value={form.teacher_external_id} onChange={(event) => setForm((prev) => ({ ...prev, teacher_external_id: event.target.value }))} />
+          </label>
+        </div>
+        <div className="inline-form">
+          <label className="field-group">
+            <span>Mã môn</span>
+            <input value={form.course_code} onChange={(event) => setForm((prev) => ({ ...prev, course_code: event.target.value }))} />
+          </label>
+          <label className="field-group">
+            <span>Tên môn</span>
+            <input value={form.course_name} onChange={(event) => setForm((prev) => ({ ...prev, course_name: event.target.value }))} />
+          </label>
+          <label className="field-group">
+            <span>Mã lớp học phần</span>
+            <input value={form.section_code} onChange={(event) => setForm((prev) => ({ ...prev, section_code: event.target.value }))} />
+          </label>
+          <label className="field-group">
+            <span>Trạng thái</span>
+            <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}>
+              <option value="active">active</option>
+              <option value="inactive">inactive</option>
+              <option value="archived">archived</option>
+            </select>
+          </label>
+        </div>
+        <div className="button-row">
+          <button className="primary-button" type="submit" disabled={submitting}>
+            {submitting ? "Đang lưu..." : form.id ? "Cập nhật lớp học phần" : "Tạo lớp học phần"}
           </button>
-        ) : null}
+          {form.id ? (
+            <button className="secondary-button" type="button" onClick={resetForm}>
+              Hủy sửa
+            </button>
+          ) : null}
+        </div>
       </form>
 
       {feedback ? <div className="state-card">{feedback}</div> : null}
 
       <div className="panel inline-form">
         <label className="field-group">
-          <span>Tim kiem</span>
+          <span>Tìm kiếm</span>
           <input
             value={filters.search}
             onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
-            placeholder="Ma mon, ten mon, section, teacher"
+            placeholder="Mã môn, tên môn, section, giảng viên"
           />
         </label>
         <label className="field-group">
-          <span>Loc theo hoc ky</span>
+          <span>Học kỳ</span>
           <select value={filters.term_id} onChange={(event) => setFilters((prev) => ({ ...prev, term_id: event.target.value }))}>
-            <option value="">Tat ca hoc ky</option>
+            <option value="">Tất cả học kỳ</option>
             {state.terms.map((term) => (
               <option key={term.id} value={term.id}>
                 {term.term_code}
@@ -223,9 +248,34 @@ export default function CourseSectionManagement() {
           </select>
         </label>
         <label className="field-group">
-          <span>Loc theo trang thai</span>
+          <span>Khoa</span>
+          <select
+            value={filters.faculty}
+            onChange={(event) => setFilters((prev) => ({ ...prev, faculty: event.target.value, program: "" }))}
+          >
+            <option value="">Tất cả khoa</option>
+            {facultyOptions.map((faculty) => (
+              <option key={faculty} value={faculty}>
+                {faculty}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field-group">
+          <span>Ngành / Chương trình</span>
+          <select value={filters.program} onChange={(event) => setFilters((prev) => ({ ...prev, program: event.target.value }))}>
+            <option value="">Tất cả chương trình</option>
+            {programOptions.map((program) => (
+              <option key={program} value={program}>
+                {program}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field-group">
+          <span>Trạng thái</span>
           <select value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}>
-            <option value="">Tat ca trang thai</option>
+            <option value="">Tất cả trạng thái</option>
             <option value="active">active</option>
             <option value="inactive">inactive</option>
             <option value="archived">archived</option>
@@ -234,43 +284,43 @@ export default function CourseSectionManagement() {
       </div>
 
       <div className="table-card">
-        <h3 className="page-title">Danh sach lop hoc phan</h3>
+        <h3 className="page-title">Danh sách lớp học phần</h3>
         {filteredSections.length ? (
           <table>
             <thead>
               <tr>
-                <th>Section</th>
-                <th>Mon hoc</th>
-                <th>Giang vien</th>
-                <th>Faculty</th>
-                <th>Trang thai</th>
-                <th>Thao tac</th>
+                <th>Khoa</th>
+                <th>Ngành / Chương trình</th>
+                <th>Lớp học phần</th>
+                <th>Môn học</th>
+                <th>Giảng viên</th>
+                <th>Học kỳ</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {filteredSections.map((item) => (
                 <tr key={item.id}>
+                  <td>{item.faculty || "--"}</td>
+                  <td>{item.program_name || "--"}</td>
                   <td>{item.section_code}</td>
                   <td>
                     <strong>{item.course_name}</strong>
                     <div className="helper-text">{item.course_code}</div>
                   </td>
-                  <td>{item.teacher_external_id || "--"}</td>
-                  <td>{item.faculty || "--"}</td>
+                  <td>{item.teacher_name || item.teacher_external_id || "--"}</td>
+                  <td>{item.term_code || "--"}</td>
                   <td>{item.status}</td>
                   <td className="table-actions">
                     <button className="secondary-button" type="button" onClick={() => beginEdit(item)}>
-                      Sua
+                      Sửa
                     </button>
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      onClick={() => handleArchive(item, item.status === "active" ? "inactive" : "active")}
-                    >
-                      {item.status === "active" ? "Deactivate" : "Activate"}
+                    <button className="secondary-button" type="button" onClick={() => handleArchive(item, item.status === "active" ? "inactive" : "active")}>
+                      {item.status === "active" ? "Ngừng" : "Kích hoạt"}
                     </button>
                     <button className="danger-button" type="button" onClick={() => handleArchive(item, "archived")}>
-                      Archive
+                      Lưu trữ
                     </button>
                   </td>
                 </tr>
@@ -278,7 +328,7 @@ export default function CourseSectionManagement() {
             </tbody>
           </table>
         ) : (
-          <EmptyState message="Chua co lop hoc phan phu hop voi bo loc." />
+          <EmptyState message="Chưa có lớp học phần phù hợp với bộ lọc." />
         )}
       </div>
     </div>

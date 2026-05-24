@@ -11,7 +11,7 @@ const api = axios.create({
 const TIMETABLE_TOKEN_KEY = 'timetable_access_token';
 
 const timetableApi = axios.create({
-  baseURL: import.meta.env.VITE_TIMETABLE_API_BASE_URL || 'http://127.0.0.1:8001',
+  baseURL: import.meta.env.VITE_TIMETABLE_API_BASE_URL || 'http://localhost:8001',
   timeout: 20000,
 });
 

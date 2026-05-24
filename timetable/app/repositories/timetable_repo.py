@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy import func
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
+from app.models.external_user import ExternalUserCache
 
 from app.models.course_section import CourseSection, CourseSectionStudent
 from app.models.timetable import ExamSchedule, TimetableEntry
@@ -28,17 +29,80 @@ def list_timetable_entries(
     *,
     section_id: UUID | None = None,
     term_id: UUID | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+    course_code: str | None = None,
     statuses: list[str] | None = None,
 ) -> list[TimetableEntry]:
     stmt = select(TimetableEntry)
     if section_id:
         stmt = stmt.where(TimetableEntry.section_id == section_id)
+    if term_id or faculty or program_name or course_code:
+        stmt = stmt.join(CourseSection, CourseSection.id == TimetableEntry.section_id)
     if term_id:
-        stmt = stmt.join(CourseSection, CourseSection.id == TimetableEntry.section_id).where(CourseSection.term_id == term_id)
+        stmt = stmt.where(CourseSection.term_id == term_id)
+    if faculty:
+        stmt = stmt.where(CourseSection.faculty == faculty)
+    if program_name:
+        stmt = stmt.where(CourseSection.program_name == program_name)
+    if course_code:
+        stmt = stmt.where(CourseSection.course_code == course_code)
     if statuses:
         stmt = stmt.where(TimetableEntry.status.in_(statuses))
     stmt = stmt.order_by(TimetableEntry.day_of_week, TimetableEntry.start_period.nullslast(), TimetableEntry.start_time)
     return list(db.scalars(stmt).all())
+
+
+def list_timetable_entries_with_sections(
+    db: Session,
+    *,
+    section_id: UUID | None = None,
+    term_id: UUID | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+    course_code: str | None = None,
+    statuses: list[str] | None = None,
+    q: str | None = None,
+) -> list[tuple[TimetableEntry, CourseSection]]:
+    stmt = select(TimetableEntry, CourseSection).join(CourseSection, CourseSection.id == TimetableEntry.section_id)
+    normalized_q = str(q or "").strip()
+    if normalized_q:
+        like_pattern = f"%{normalized_q}%"
+        stmt = stmt.outerjoin(
+            ExternalUserCache,
+            (ExternalUserCache.external_user_id == CourseSection.teacher_external_id) & (ExternalUserCache.role == "teacher"),
+        ).where(
+            or_(
+                CourseSection.course_name.ilike(like_pattern),
+                CourseSection.course_code.ilike(like_pattern),
+                CourseSection.section_code.ilike(like_pattern),
+                TimetableEntry.room.ilike(like_pattern),
+                TimetableEntry.location.ilike(like_pattern),
+                ExternalUserCache.full_name.ilike(like_pattern),
+            )
+        )
+    if section_id:
+        stmt = stmt.where(TimetableEntry.section_id == section_id)
+    if term_id:
+        stmt = stmt.where(CourseSection.term_id == term_id)
+    if faculty:
+        stmt = stmt.where(CourseSection.faculty == faculty)
+    if program_name:
+        stmt = stmt.where(CourseSection.program_name == program_name)
+    if course_code:
+        stmt = stmt.where(CourseSection.course_code == course_code)
+    if statuses:
+        stmt = stmt.where(TimetableEntry.status.in_(statuses))
+    stmt = stmt.order_by(
+        CourseSection.faculty.nullslast(),
+        CourseSection.program_name.nullslast(),
+        CourseSection.course_code,
+        CourseSection.section_code,
+        TimetableEntry.day_of_week,
+        TimetableEntry.start_period.nullslast(),
+        TimetableEntry.start_time,
+    )
+    return list(db.execute(stmt).all())
 
 
 def get_timetable_entry(db: Session, entry_id: UUID) -> TimetableEntry | None:
@@ -143,6 +207,23 @@ def list_student_exam_schedules(db: Session, student_external_id: str) -> list[E
         .order_by(ExamSchedule.exam_date, ExamSchedule.start_time)
     )
     return list(db.scalars(stmt).all())
+
+
+def list_student_exam_schedules_with_sections(
+    db: Session,
+    student_external_id: str,
+) -> list[tuple[ExamSchedule, CourseSection]]:
+    stmt = (
+        select(ExamSchedule, CourseSection)
+        .join(CourseSection, CourseSection.id == ExamSchedule.section_id)
+        .join(CourseSectionStudent, CourseSectionStudent.section_id == CourseSection.id)
+        .where(
+            CourseSectionStudent.student_external_id == student_external_id,
+            CourseSectionStudent.enrollment_status == "active",
+        )
+        .order_by(ExamSchedule.exam_date, ExamSchedule.start_time, CourseSection.section_code)
+    )
+    return list(db.execute(stmt).all())
 
 
 def get_exam_schedule(db: Session, exam_id: UUID) -> ExamSchedule | None:

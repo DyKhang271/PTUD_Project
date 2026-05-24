@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, require_role
-from app.repositories import attendance_repo, external_user_repo, section_repo, timetable_repo
+from app.repositories import attendance_repo, external_user_repo, section_repo
 from app.schemas.attendance_schema import (
     AttendanceHistoryItem,
     AttendanceRecordRead,
@@ -16,7 +16,7 @@ from app.schemas.attendance_schema import (
     CheckInQrRequest,
 )
 from app.schemas.section_schema import CourseSectionRead
-from app.schemas.timetable_schema import ExamScheduleRead, StudentTimetableItem
+from app.schemas.timetable_schema import StudentExamScheduleItem, StudentTimetableItem
 from app.services import attendance_service, timetable_service
 
 router = APIRouter(prefix="/student", tags=["student"])
@@ -61,12 +61,11 @@ def my_timetable_legacy(
     return my_timetable(current_user=current_user, db=db, term_id=term_id, date_from=date_from, date_to=date_to)
 
 
-@router.get("/exams", response_model=list[ExamScheduleRead])
+@router.get("/exams", response_model=list[StudentExamScheduleItem])
 def my_exams(current_user: StudentUser, db: Annotated[Session, Depends(get_db)]) -> list:
-    return timetable_repo.list_student_exam_schedules(db, current_user.external_id)
+    return timetable_service.get_student_exam_schedules(db, student_external_id=current_user.external_id)
 
-
-@router.get("/me/exams", response_model=list[ExamScheduleRead], include_in_schema=False)
+@router.get("/me/exams", response_model=list[StudentExamScheduleItem], include_in_schema=False)
 def my_exams_legacy(current_user: StudentUser, db: Annotated[Session, Depends(get_db)]) -> list:
     return my_exams(current_user=current_user, db=db)
 

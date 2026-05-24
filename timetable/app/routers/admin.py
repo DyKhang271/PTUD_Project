@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -24,6 +24,7 @@ from app.schemas.scheduling_constraints_schema import (
 from app.schemas.section_schema import (
     CoreCourseSectionsImportRequest,
     CoreCourseSectionsImportResponse,
+    CourseSubjectSummaryRead,
     CourseSectionCreate,
     CourseSectionRead,
     CourseSectionUpdate,
@@ -35,6 +36,8 @@ from app.schemas.section_schema import (
 )
 from app.schemas.term_schema import TermCreate, TermRead, TermUpdate
 from app.schemas.timetable_schema import (
+    AdminTimetableCourseGroupRead,
+    AdminTimetableEntryRead,
     ExamScheduleCreate,
     ExamScheduleRead,
     ExamScheduleUpdate,
@@ -54,6 +57,17 @@ from app.services import (
 )
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_role(["admin"]))])
+
+
+def _resolve_term_id(db: Session, *, term_id: UUID | None = None, term_code: str | None = None) -> UUID | None:
+    if term_id:
+        return term_id
+    if not term_code:
+        return None
+    term = section_repo.get_term_by_code(db, term_code)
+    if term is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Academic term not found")
+    return term.id
 
 
 @router.get("/faculties", response_model=list[FacultyRead])
@@ -111,18 +125,59 @@ def create_course_section(payload: CourseSectionCreate, db: Annotated[Session, D
 
 
 @router.get("/course-sections", response_model=list[CourseSectionRead])
-def list_course_sections(db: Annotated[Session, Depends(get_db)], term_id: UUID | None = None, teacher_external_id: str | None = None):
-    return section_repo.list_sections(db, term_id=term_id, teacher_external_id=teacher_external_id)
+def list_course_sections(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+    teacher_external_id: str | None = None,
+    faculty: str | None = None,
+    faculty_code: str | None = None,
+    program: str | None = None,
+    program_code: str | None = None,
+    course_id: str | None = None,
+    status: str | None = None,
+    curriculum_semester: int | None = None,
+):
+    del curriculum_semester
+    return section_service.list_sections_enriched(
+        db,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+        teacher_external_id=teacher_external_id,
+        faculty=faculty or faculty_code,
+        program_name=program or program_code,
+        course_code=course_id,
+        status=status,
+    )
+
+
+@router.get("/course-subjects", response_model=list[CourseSubjectSummaryRead])
+def list_course_subjects(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+    faculty: str | None = None,
+    faculty_code: str | None = None,
+    program: str | None = None,
+    program_code: str | None = None,
+    curriculum_semester: int | None = None,
+):
+    del curriculum_semester
+    return section_service.list_course_subjects(
+        db,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+        faculty=faculty or faculty_code,
+        program_name=program or program_code,
+    )
 
 
 @router.get("/terms/{term_id}/sections", response_model=list[CourseSectionRead])
 def list_sections_by_term(term_id: UUID, db: Annotated[Session, Depends(get_db)]):
-    return section_repo.list_sections(db, term_id=term_id)
+    return section_service.list_sections_enriched(db, term_id=term_id)
 
 
 @router.get("/course-sections/{section_id}", response_model=CourseSectionRead)
 def get_course_section(section_id: UUID, db: Annotated[Session, Depends(get_db)]):
-    return section_service.get_section_or_404(db, section_id)
+    return section_service.get_section_enriched(db, section_id)
 
 
 @router.put("/course-sections/{section_id}", response_model=CourseSectionRead)
@@ -182,9 +237,64 @@ def create_timetable(payload: TimetableEntryCreate, db: Annotated[Session, Depen
     return timetable_service.create_timetable_entry(db, payload.model_dump())
 
 
-@router.get("/timetable", response_model=list[TimetableEntryRead])
-def list_timetable(db: Annotated[Session, Depends(get_db)], section_id: UUID | None = None):
-    return timetable_repo.list_timetable_entries(db, section_id=section_id)
+@router.get("/timetable", response_model=list[AdminTimetableEntryRead])
+def list_timetable(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+    faculty: str | None = None,
+    faculty_code: str | None = None,
+    program: str | None = None,
+    program_code: str | None = None,
+    course_id: str | None = None,
+    section_id: UUID | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    scheduled_status: str = "all",
+    curriculum_semester: int | None = None,
+):
+    del curriculum_semester
+    return timetable_service.list_admin_timetable_entries(
+        db,
+        section_id=section_id,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+        faculty=faculty or faculty_code,
+        program_name=program or program_code,
+        course_code=course_id,
+        status=status,
+        q=q,
+        scheduled_status=scheduled_status,
+    )
+
+
+@router.get("/timetable/course-groups", response_model=list[AdminTimetableCourseGroupRead])
+def list_timetable_course_groups(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    term_code: str | None = None,
+    faculty: str | None = None,
+    faculty_code: str | None = None,
+    program: str | None = None,
+    program_code: str | None = None,
+    course_id: str | None = None,
+    section_id: UUID | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    scheduled_status: str = "all",
+    curriculum_semester: int | None = None,
+):
+    return timetable_service.list_admin_timetable_course_groups(
+        db,
+        term_id=_resolve_term_id(db, term_id=term_id, term_code=term_code),
+        faculty=faculty or faculty_code,
+        program_name=program or program_code,
+        course_code=course_id,
+        section_id=section_id,
+        status=status,
+        q=q,
+        scheduled_status=scheduled_status,
+        curriculum_semester=curriculum_semester,
+    )
 
 
 @router.put("/timetable/{entry_id}", response_model=TimetableEntryRead)

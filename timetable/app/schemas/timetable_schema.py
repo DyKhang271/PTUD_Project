@@ -100,6 +100,71 @@ class TeacherTimetableItem(BaseModel):
     status: str = "published"
 
 
+class AdminTimetableEntryRead(BaseModel):
+    id: UUID
+    section_id: UUID
+    term_id: UUID | None = None
+    term_code: str | None = None
+    term_name: str | None = None
+    faculty: str | None = None
+    program_name: str | None = None
+    section_code: str
+    course_code: str
+    course_name: str
+    teacher_external_id: str | None = None
+    teacher_name: str | None = None
+    day_of_week: int
+    start_period: int | None = None
+    end_period: int | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    room: str | None = None
+    weeks: str | None = None
+    location: str | None = None
+    status: str = "published"
+    session_type: str = "study"
+    note: str | None = None
+    valid_from: DateType | None = None
+    valid_to: DateType | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminTimetableCourseGroupRead(BaseModel):
+    term_id: UUID | None = None
+    term_code: str | None = None
+    term_name: str | None = None
+    faculty: str | None = None
+    program_name: str | None = None
+    course_id: str
+    course_code: str
+    course_name: str
+    section_count: int = 0
+    scheduled_count: int = 0
+    schedules: list[AdminTimetableEntryRead] = Field(default_factory=list)
+
+
+class StudentExamScheduleItem(BaseModel):
+    id: UUID
+    section_id: UUID
+    term_id: UUID | None = None
+    term_code: str | None = None
+    term_name: str | None = None
+    course_code: str
+    course_name: str
+    section_code: str
+    teacher_external_id: str | None = None
+    teacher_name: str | None = None
+    exam_date: DateType
+    start_time: time | None = None
+    end_time: time | None = None
+    room: str | None = None
+    location: str | None = None
+    exam_type: str | None = None
+    note: str | None = None
+    created_at: datetime
+
+
 class SectionTimetableWriteBase(BaseModel):
     day_of_week: int = Field(ge=1, le=7)
     start_period: int = Field(ge=1)

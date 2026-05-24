@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 import re
 from uuid import UUID
@@ -11,7 +12,14 @@ from sqlalchemy.orm import Session
 from app.models.academic_term import AcademicTerm
 from app.models.course_section import CourseSection
 from app.repositories import external_user_repo, section_repo
-from app.schemas.section_schema import CoreCourseSectionsImportResponse, SectionStudentRead, SectionStudentsImportResponse
+from app.schemas.section_schema import (
+    CoreCourseSectionsImportResponse,
+    CourseSubjectSummaryRead,
+    CourseSectionRead,
+    SectionStudentRead,
+    SectionStudentsImportResponse,
+)
+from app.repositories import timetable_repo
 from app.services.core_api_client import CoreApiClient, normalize_student_payload, normalize_teacher_payload
 
 
@@ -34,6 +42,14 @@ def _extract_string_ids(values: Iterable[object]) -> list[str]:
         if normalized:
             clean_ids.append(normalized)
     return clean_ids
+
+
+def _pick_most_common(values: Iterable[str | None]) -> str | None:
+    normalized = [str(value).strip() for value in values if str(value or "").strip()]
+    if not normalized:
+        return None
+    counts = Counter(normalized)
+    return counts.most_common(1)[0][0]
 
 
 def _pick_best_source_term(source_terms: list[dict]) -> dict | None:
@@ -70,6 +86,47 @@ def _find_source_term(source_terms: list[dict], value: str | None) -> dict | Non
     return None
 
 
+def _derive_section_academic_profile(
+    *,
+    linked_student_ids: list[str],
+    student_profiles_by_id: dict[str, dict],
+    fallback_faculty: str | None = None,
+    fallback_program_name: str | None = None,
+) -> tuple[str | None, str | None]:
+    matched_profiles = [
+        student_profiles_by_id[student_id]
+        for student_id in linked_student_ids
+        if student_id in student_profiles_by_id
+    ]
+    faculty = _pick_most_common(profile.get("faculty") for profile in matched_profiles) or fallback_faculty
+    program_name = _pick_most_common(profile.get("program_name") for profile in matched_profiles) or fallback_program_name
+    return faculty, program_name
+
+
+def _to_course_section_read(db: Session, section: CourseSection) -> CourseSectionRead:
+    teacher = None
+    if section.teacher_external_id:
+        teacher = external_user_repo.get_cached_user(db, section.teacher_external_id, role="teacher")
+    return CourseSectionRead(
+        id=section.id,
+        term_id=section.term_id,
+        course_code=section.course_code,
+        course_name=section.course_name,
+        section_code=section.section_code,
+        teacher_external_id=section.teacher_external_id,
+        teacher_name=teacher.full_name if teacher else None,
+        faculty=section.faculty,
+        program_name=section.program_name,
+        student_count=section.student_count,
+        total_sessions=section.total_sessions,
+        status=section.status,
+        term_code=section.term.term_code if section.term else None,
+        term_name=section.term.term_name if section.term else None,
+        created_at=section.created_at,
+        updated_at=section.updated_at,
+    )
+
+
 def get_section_or_404(db: Session, section_id: UUID):
     section = section_repo.get_section(db, section_id)
     if section is None:
@@ -100,11 +157,127 @@ def update_term(db: Session, term_id: UUID, values: dict):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Term update conflicts with existing data") from exc
 
 
+def list_sections_enriched(
+    db: Session,
+    *,
+    term_id: UUID | None = None,
+    teacher_external_id: str | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+    course_code: str | None = None,
+    status: str | None = None,
+) -> list[CourseSectionRead]:
+    sections = section_repo.list_sections(
+        db,
+        term_id=term_id,
+        teacher_external_id=teacher_external_id,
+        faculty=faculty,
+        program_name=program_name,
+        course_code=course_code,
+        status=status,
+    )
+    teacher_ids = [section.teacher_external_id for section in sections if section.teacher_external_id]
+    teachers = external_user_repo.get_cached_users(db, teacher_ids, role="teacher")
+    return [
+        CourseSectionRead(
+            id=section.id,
+            term_id=section.term_id,
+            course_code=section.course_code,
+            course_name=section.course_name,
+            section_code=section.section_code,
+            teacher_external_id=section.teacher_external_id,
+            teacher_name=teachers.get(section.teacher_external_id).full_name if section.teacher_external_id and teachers.get(section.teacher_external_id) else None,
+            faculty=section.faculty,
+            program_name=section.program_name,
+            student_count=section.student_count,
+            total_sessions=section.total_sessions,
+            status=section.status,
+            term_code=section.term.term_code if section.term else None,
+            term_name=section.term.term_name if section.term else None,
+            created_at=section.created_at,
+            updated_at=section.updated_at,
+        )
+        for section in sections
+    ]
+
+
+def list_course_subjects(
+    db: Session,
+    *,
+    term_id: UUID | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+) -> list[CourseSubjectSummaryRead]:
+    sections = section_repo.list_sections(
+        db,
+        term_id=term_id,
+        faculty=faculty,
+        program_name=program_name,
+    )
+    scheduled_rows = timetable_repo.list_timetable_entries_with_sections(
+        db,
+        term_id=term_id,
+        faculty=faculty,
+        program_name=program_name,
+    )
+
+    grouped_sections: dict[tuple[UUID | None, str | None, str | None, str, str], set[UUID]] = defaultdict(set)
+    scheduled_counts: dict[tuple[UUID | None, str | None, str | None, str, str], int] = defaultdict(int)
+    term_meta: dict[tuple[UUID | None, str | None, str | None, str, str], tuple[str | None, str | None]] = {}
+
+    for section in sections:
+        key = (section.term_id, section.faculty, section.program_name, section.course_code, section.course_name)
+        grouped_sections[key].add(section.id)
+        term_meta[key] = (
+            section.term.term_code if section.term else None,
+            section.term.term_name if section.term else None,
+        )
+
+    for entry, section in scheduled_rows:
+        key = (section.term_id, section.faculty, section.program_name, section.course_code, section.course_name)
+        grouped_sections[key].add(section.id)
+        scheduled_counts[key] += 1
+        term_meta[key] = (
+            section.term.term_code if section.term else None,
+            section.term.term_name if section.term else None,
+        )
+
+    items = [
+        CourseSubjectSummaryRead(
+            course_id=course_code,
+            course_code=course_code,
+            course_name=course_name,
+            term_id=term_key,
+            term_code=term_meta.get(key, (None, None))[0],
+            term_name=term_meta.get(key, (None, None))[1],
+            faculty=faculty_name,
+            program_name=program,
+            section_count=len(section_ids),
+            scheduled_count=scheduled_counts.get(key, 0),
+        )
+        for key, section_ids in grouped_sections.items()
+        for term_key, faculty_name, program, course_code, course_name in [key]
+    ]
+    return sorted(
+        items,
+        key=lambda item: (
+            item.faculty or "",
+            item.program_name or "",
+            item.course_name,
+            item.course_code,
+        ),
+    )
+
+
+def get_section_enriched(db: Session, section_id: UUID) -> CourseSectionRead:
+    return _to_course_section_read(db, get_section_or_404(db, section_id))
+
+
 def create_section(db: Session, values: dict):
     try:
         section = section_repo.create_section(db, values)
         db.commit()
-        return section
+        return _to_course_section_read(db, section)
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Section already exists in this term") from exc
@@ -115,7 +288,7 @@ def update_section(db: Session, section_id: UUID, values: dict):
     try:
         updated = section_repo.update_section(db, section, values)
         db.commit()
-        return updated
+        return _to_course_section_read(db, updated)
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Section update conflicts with existing data") from exc
@@ -240,11 +413,12 @@ def assign_teacher(db: Session, section_id: UUID, teacher_id: str, *, commit: bo
         {
             "teacher_external_id": teacher_external_id,
             "faculty": section.faculty or teacher.get("faculty"),
+            "program_name": section.program_name,
         },
     )
     if commit:
         db.commit()
-    return updated
+    return _to_course_section_read(db, updated) if commit else updated
 
 
 def import_course_sections_from_core(db: Session, payload: dict) -> CoreCourseSectionsImportResponse:
@@ -412,6 +586,7 @@ def import_course_sections_from_core(db: Session, payload: dict) -> CoreCourseSe
             section = _get_section_by_term_and_code(db, term_id=term.id, section_code=section_code)
             resolved_teacher_external_id = teacher_external_id
             resolved_faculty = teacher_faculty or teacher_department
+            resolved_program_name = None
             if section is not None:
                 existing_teacher_id = section.teacher_external_id
                 if existing_teacher_id and not teacher_external_id:
@@ -423,6 +598,14 @@ def import_course_sections_from_core(db: Session, payload: dict) -> CoreCourseSe
                     resolved_teacher_external_id = existing_teacher_id
                 elif existing_teacher_id and teacher_external_id == existing_teacher_id:
                     resolved_teacher_external_id = existing_teacher_id
+                resolved_program_name = section.program_name
+
+            derived_faculty, derived_program_name = _derive_section_academic_profile(
+                linked_student_ids=student_ids,
+                student_profiles_by_id=student_profiles_by_id,
+                fallback_faculty=resolved_faculty if resolved_faculty else (section.faculty if section else None),
+                fallback_program_name=resolved_program_name,
+            )
 
             section_values = {
                 "term_id": term.id,
@@ -430,7 +613,8 @@ def import_course_sections_from_core(db: Session, payload: dict) -> CoreCourseSe
                 "course_name": course_name,
                 "section_code": section_code,
                 "teacher_external_id": resolved_teacher_external_id,
-                "faculty": resolved_faculty if resolved_faculty else (section.faculty if section else None),
+                "faculty": derived_faculty,
+                "program_name": derived_program_name,
                 "student_count": len(student_ids),
                 "status": "active",
             }

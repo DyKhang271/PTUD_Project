@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -183,6 +184,13 @@ def _extract_ids(values: list[Any] | None) -> list[str]:
     return clean_ids
 
 
+def _pick_most_common(values: list[str | None]) -> str | None:
+    normalized = [str(value).strip() for value in values if str(value or "").strip()]
+    if not normalized:
+        return None
+    return Counter(normalized).most_common(1)[0][0]
+
+
 def _get_term_by_code(db: Session, term_code: str) -> AcademicTerm | None:
     return db.scalar(select(AcademicTerm).where(AcademicTerm.term_code == term_code))
 
@@ -283,6 +291,7 @@ def _upsert_section(
     course_code: str,
     course_name: str,
     faculty: str | None,
+    program_name: str | None = None,
     teacher_external_id: str | None = None,
 ) -> tuple[CourseSection, bool]:
     section = _get_section_by_term_and_code(db, term_id=term_id, section_code=section_code)
@@ -293,6 +302,7 @@ def _upsert_section(
         "section_code": section_code,
         "teacher_external_id": teacher_external_id,
         "faculty": faculty or DEFAULT_FACULTY,
+        "program_name": program_name,
         "total_sessions": 15,
         "status": "active",
     }
@@ -340,8 +350,10 @@ def _upsert_timetable_entry(db: Session, *, section_id: UUID, blueprint: dict[st
         "end_time": blueprint.get("end_time"),
         "room": blueprint.get("room"),
         "location": blueprint.get("location"),
+        "weeks": blueprint.get("weeks"),
         "valid_from": DEFAULT_TIMETABLE_VALID_FROM,
         "valid_to": DEFAULT_TIMETABLE_VALID_TO,
+        "status": blueprint.get("status", "published"),
         "session_type": blueprint.get("session_type", "study"),
         "note": blueprint.get("note"),
     }
@@ -372,6 +384,118 @@ def _upsert_global_policy(db: Session) -> AttendancePolicy:
 def _resolve_session_date(day_of_week: int) -> date:
     # App timetable uses Monday=1 via Python weekday()+1.
     return DEFAULT_TIMETABLE_VALID_FROM + timedelta(days=max(day_of_week - 1, 0))
+
+
+def _build_generated_timetable_blueprint(section: CourseSection, index: int) -> dict[str, Any]:
+    fallback_by_slot = [
+        {
+            "day_of_week": 1,
+            "start_period": 1,
+            "end_period": 3,
+            "start_time": time(7, 0),
+            "end_time": time(9, 30),
+            "room": "A1.01",
+            "location": "Co so 1",
+            "session_type": "study",
+        },
+        {
+            "day_of_week": 2,
+            "start_period": 4,
+            "end_period": 6,
+            "start_time": time(9, 15),
+            "end_time": time(11, 45),
+            "room": "B2.03",
+            "location": "Co so 1",
+            "session_type": "practice",
+        },
+        {
+            "day_of_week": 3,
+            "start_period": 7,
+            "end_period": 9,
+            "start_time": time(13, 0),
+            "end_time": time(15, 30),
+            "room": "C3.05",
+            "location": "Co so 2",
+            "session_type": "study",
+        },
+        {
+            "day_of_week": 4,
+            "start_period": 10,
+            "end_period": 12,
+            "start_time": time(18, 0),
+            "end_time": time(20, 30),
+            "room": "Online",
+            "location": "Truc tuyen",
+            "session_type": "online",
+        },
+        {
+            "day_of_week": 5,
+            "start_period": 1,
+            "end_period": 3,
+            "start_time": time(7, 0),
+            "end_time": time(9, 30),
+            "room": "H6.01",
+            "location": "Co so 1",
+            "session_type": "study",
+        },
+        {
+            "day_of_week": 6,
+            "start_period": 7,
+            "end_period": 9,
+            "start_time": time(13, 0),
+            "end_time": time(15, 30),
+            "room": "Lab A2",
+            "location": "Co so 1",
+            "session_type": "practice",
+        },
+    ]
+    if section.section_code in SAMPLE_TIMETABLE_BY_SECTION:
+        sample = SAMPLE_TIMETABLE_BY_SECTION[section.section_code].copy()
+        sample.setdefault("status", "published")
+        sample.setdefault("weeks", "1-15")
+        return sample
+    generated = fallback_by_slot[index % len(fallback_by_slot)].copy()
+    generated["room"] = generated["room"] if generated["room"] == "Online" else f"{generated['room']}-{(index % 3) + 1}"
+    generated["weeks"] = "1-15"
+    generated["status"] = "published"
+    generated["note"] = f"Lich hoc demo cho {section.section_code}"
+    return generated
+
+
+def _blueprint_slot_key(blueprint: dict[str, Any]) -> tuple[int, str, str]:
+    start_value = blueprint.get("start_time")
+    end_value = blueprint.get("end_time")
+    start_key = start_value.strftime("%H:%M") if hasattr(start_value, "strftime") else str(start_value or "")
+    end_key = end_value.strftime("%H:%M") if hasattr(end_value, "strftime") else str(end_value or "")
+    return int(blueprint["day_of_week"]), start_key, end_key
+
+
+def _choose_non_conflicting_blueprint(
+    *,
+    section: CourseSection,
+    index: int,
+    linked_student_ids: list[str],
+    occupied_slots_by_student: dict[str, set[tuple[int, str, str]]],
+) -> dict[str, Any]:
+    fallback_count = 6
+    primary = _build_generated_timetable_blueprint(section, index)
+    candidates = [primary]
+    for offset in range(1, fallback_count + 1):
+        candidates.append(_build_generated_timetable_blueprint(section, index + offset))
+
+    for blueprint in candidates:
+        slot_key = _blueprint_slot_key(blueprint)
+        has_conflict = any(slot_key in occupied_slots_by_student.setdefault(student_id, set()) for student_id in linked_student_ids)
+        if not has_conflict:
+            for student_id in linked_student_ids:
+                occupied_slots_by_student.setdefault(student_id, set()).add(slot_key)
+            return blueprint
+
+    chosen = candidates[0]
+    chosen_slot_key = _blueprint_slot_key(chosen)
+    for student_id in linked_student_ids:
+        occupied_slots_by_student.setdefault(student_id, set()).add(chosen_slot_key)
+    return chosen
 
 
 def _upsert_attendance_session(
@@ -598,12 +722,13 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
 
         section_lookup: dict[str, CourseSection] = {}
         timetable_lookup: dict[str, TimetableEntry] = {}
+        occupied_slots_by_student: dict[str, set[tuple[int, str, str]]] = {}
         preferred_faculty = next(
             (profile.get("faculty") for profile in student_profiles.values() if profile.get("faculty")),
             DEFAULT_FACULTY,
         )
 
-        for item in source_items:
+        for item_index, item in enumerate(source_items):
             section_code = str(item.get("section_code") or "").strip()
             course_code = str(item.get("course_code") or section_code[:10]).strip()
             course_name = str(item.get("course_name") or "").strip()
@@ -611,25 +736,33 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
                 errors.append(f"Skipped invalid course source item '{section_code or 'unknown'}'")
                 continue
 
-            section, created_section = _upsert_section(
-                db,
-                term_id=term.id,
-                section_code=section_code,
-                course_code=course_code,
-                course_name=course_name,
-                faculty=preferred_faculty,
-                teacher_external_id=None,
-            )
-            section_lookup[section_code] = section
-            if created_section:
-                counters.imported_sections += 1
-
             linked_ids = _extract_ids(item.get("student_ids") or [])
             if requested_student_ids:
                 requested_set = set(student_profiles.keys()) or set(requested_student_ids)
                 linked_ids = [student_id for student_id in linked_ids if student_id in requested_set]
                 if not linked_ids:
                     linked_ids = [student_id for student_id in student_profiles.keys()]
+
+            derived_faculty = _pick_most_common(
+                [student_profiles[student_id].get("faculty") for student_id in linked_ids if student_id in student_profiles]
+            ) or preferred_faculty
+            derived_program_name = _pick_most_common(
+                [student_profiles[student_id].get("program_name") for student_id in linked_ids if student_id in student_profiles]
+            )
+
+            section, created_section = _upsert_section(
+                db,
+                term_id=term.id,
+                section_code=section_code,
+                course_code=course_code,
+                course_name=course_name,
+                faculty=derived_faculty,
+                program_name=derived_program_name,
+                teacher_external_id=None,
+            )
+            section_lookup[section_code] = section
+            if created_section:
+                counters.imported_sections += 1
 
             for student_id in linked_ids:
                 if student_id not in student_profiles:
@@ -643,12 +776,17 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
                 )
                 if created_link:
                     counters.linked_students += 1
-
-            if create_sample_timetable and section_code in SAMPLE_TIMETABLE_BY_SECTION:
+            if create_sample_timetable:
+                blueprint = _choose_non_conflicting_blueprint(
+                    section=section,
+                    index=item_index,
+                    linked_student_ids=linked_ids,
+                    occupied_slots_by_student=occupied_slots_by_student,
+                )
                 entry, created_entry = _upsert_timetable_entry(
                     db,
                     section_id=section.id,
-                    blueprint=SAMPLE_TIMETABLE_BY_SECTION[section_code],
+                    blueprint=blueprint,
                 )
                 timetable_lookup[section_code] = entry
                 if created_entry:
@@ -657,7 +795,6 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
         _upsert_global_policy(db)
 
         if create_sample_attendance:
-            target_student_ids = list(student_profiles.keys())
             for section_code, section in section_lookup.items():
                 entry = timetable_lookup.get(section_code)
                 if entry is None:
@@ -678,6 +815,11 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
                     section_code,
                     {"status": "present", "method": "qr"},
                 )
+                target_student_ids = [
+                    student.student_external_id
+                    for student in section.students
+                    if student.enrollment_status == "active"
+                ]
                 for student_id in target_student_ids:
                     _, created_record = _upsert_attendance_record(
                         db,

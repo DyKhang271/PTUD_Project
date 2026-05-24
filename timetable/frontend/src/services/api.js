@@ -36,14 +36,14 @@ export function setTokenRefreshHandler(handler) {
 }
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_TIMETABLE_API_BASE_URL || "http://127.0.0.1:8001",
+  baseURL: import.meta.env.VITE_TIMETABLE_API_BASE_URL || "http://localhost:8001",
   headers: {
     "Content-Type": "application/json",
   },
 });
 
 export const portalApi = axios.create({
-  baseURL: import.meta.env.VITE_PORTAL_API_BASE_URL || "http://127.0.0.1:8000/api",
+  baseURL: import.meta.env.VITE_PORTAL_API_BASE_URL || "http://localhost:8000/api",
   headers: {
     "Content-Type": "application/json",
   },

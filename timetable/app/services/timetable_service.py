@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, timedelta
 from uuid import UUID
 
@@ -10,8 +11,14 @@ from sqlalchemy.orm import Session
 from app.models.course_section import CourseSection, CourseSectionStudent
 from app.models.scheduling_constraints import Room, SectionSchedulingRequirement, TeacherAvailability
 from app.models.timetable import TimetableEntry
-from app.repositories import external_user_repo, timetable_repo
-from app.schemas.timetable_schema import StudentTimetableItem, TeacherTimetableItem
+from app.repositories import external_user_repo, section_repo, timetable_repo
+from app.schemas.timetable_schema import (
+    AdminTimetableCourseGroupRead,
+    AdminTimetableEntryRead,
+    StudentExamScheduleItem,
+    StudentTimetableItem,
+    TeacherTimetableItem,
+)
 from app.services.section_service import assign_teacher, get_section_or_404
 
 VISIBLE_TIMETABLE_STATUSES = {"published"}
@@ -608,6 +615,219 @@ def get_teacher_timetable(
 
 def get_teacher_today_classes(db: Session, *, teacher_external_id: str, today: date) -> list[TeacherTimetableItem]:
     return get_teacher_timetable(db, teacher_external_id=teacher_external_id, active_on=today)
+
+
+def list_admin_timetable_entries(
+    db: Session,
+    *,
+    section_id: UUID | None = None,
+    term_id: UUID | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+    course_code: str | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    scheduled_status: str = "all",
+) -> list[AdminTimetableEntryRead]:
+    if scheduled_status == "unscheduled":
+        return []
+    statuses = [status] if status else None
+    rows = timetable_repo.list_timetable_entries_with_sections(
+        db,
+        section_id=section_id,
+        term_id=term_id,
+        faculty=None if scheduled_status == "unclassified" else faculty,
+        program_name=None if scheduled_status == "unclassified" else program_name,
+        course_code=course_code,
+        statuses=statuses,
+        q=q,
+    )
+    teacher_ids = [section.teacher_external_id for _, section in rows if section.teacher_external_id]
+    teachers = external_user_repo.get_cached_users(db, teacher_ids, role="teacher")
+    items = [
+        AdminTimetableEntryRead(
+            id=entry.id,
+            section_id=section.id,
+            term_id=section.term_id,
+            term_code=section.term.term_code if section.term else None,
+            term_name=section.term.term_name if section.term else None,
+            faculty=section.faculty,
+            program_name=section.program_name,
+            section_code=section.section_code,
+            course_code=section.course_code,
+            course_name=section.course_name,
+            teacher_external_id=section.teacher_external_id,
+            teacher_name=teachers.get(section.teacher_external_id).full_name if section.teacher_external_id and teachers.get(section.teacher_external_id) else None,
+            day_of_week=entry.day_of_week,
+            start_period=entry.start_period,
+            end_period=entry.end_period,
+            start_time=entry.start_time,
+            end_time=entry.end_time,
+            room=entry.room,
+            weeks=entry.weeks,
+            location=entry.location,
+            status=entry.status,
+            session_type=entry.session_type,
+            note=entry.note,
+            valid_from=entry.valid_from,
+            valid_to=entry.valid_to,
+            created_at=entry.created_at,
+            updated_at=entry.updated_at,
+        )
+        for entry, section in rows
+        if (scheduled_status == "unclassified" and (not section.faculty or not section.program_name))
+        or (scheduled_status != "unclassified" and (section.faculty and section.program_name))
+    ]
+    return items
+
+
+def list_admin_timetable_course_groups(
+    db: Session,
+    *,
+    term_id: UUID | None = None,
+    faculty: str | None = None,
+    program_name: str | None = None,
+    course_code: str | None = None,
+    section_id: UUID | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    scheduled_status: str = "all",
+    curriculum_semester: int | None = None,  # reserved for future curriculum data mapping
+) -> list[AdminTimetableCourseGroupRead]:
+    del curriculum_semester
+    sections = section_repo.list_sections(
+        db,
+        term_id=term_id,
+        faculty=None if scheduled_status == "unclassified" else faculty,
+        program_name=None if scheduled_status == "unclassified" else program_name,
+        course_code=course_code,
+    )
+    entries = list_admin_timetable_entries(
+        db,
+        section_id=section_id,
+        term_id=term_id,
+        faculty=None if scheduled_status == "unclassified" else faculty,
+        program_name=None if scheduled_status == "unclassified" else program_name,
+        course_code=course_code,
+        status=status,
+        q=q,
+    )
+    entry_ids_by_course: dict[tuple[UUID | None, str | None, str | None, str, str], list[AdminTimetableEntryRead]] = defaultdict(list)
+    for entry in entries:
+        key = (entry.term_id, entry.faculty, entry.program_name, entry.course_code, entry.course_name)
+        entry_ids_by_course[key].append(entry)
+
+    normalized_q = str(q or "").strip().lower()
+    grouped: list[AdminTimetableCourseGroupRead] = []
+    for section in sections:
+        if section_id and section.id != section_id:
+            continue
+        is_unclassified = not section.faculty or not section.program_name
+        if scheduled_status == "unclassified" and not is_unclassified:
+            continue
+        if scheduled_status != "unclassified" and is_unclassified:
+            continue
+
+        key = (section.term_id, section.faculty, section.program_name, section.course_code, section.course_name)
+        schedules = entry_ids_by_course.get(key, [])
+        if status:
+            schedules = [item for item in schedules if item.status == status]
+
+        haystacks = [
+            section.course_name,
+            section.course_code,
+            section.section_code,
+            section.teacher_name,
+            section.teacher_external_id,
+        ]
+        if normalized_q:
+            schedule_haystacks = [
+                value
+                for schedule in schedules
+                for value in [schedule.room, schedule.location, schedule.teacher_name, schedule.teacher_external_id]
+            ]
+            all_text = " ".join(str(value or "").lower() for value in [*haystacks, *schedule_haystacks])
+            if normalized_q not in all_text:
+                continue
+
+        group = next(
+            (
+                item
+                for item in grouped
+                if item.term_id == section.term_id
+                and item.faculty == section.faculty
+                and item.program_name == section.program_name
+                and item.course_code == section.course_code
+                and item.course_name == section.course_name
+            ),
+            None,
+        )
+        if group is None:
+            group = AdminTimetableCourseGroupRead(
+                term_id=section.term_id,
+                term_code=section.term_code,
+                term_name=section.term_name,
+                faculty=section.faculty,
+                program_name=section.program_name,
+                course_id=section.course_code,
+                course_code=section.course_code,
+                course_name=section.course_name,
+                section_count=0,
+                scheduled_count=len(schedules),
+                schedules=sorted(
+                    schedules,
+                    key=lambda item: (item.day_of_week, str(item.start_time or ""), item.section_code),
+                ),
+            )
+            grouped.append(group)
+        group.section_count += 1
+
+    filtered: list[AdminTimetableCourseGroupRead] = []
+    for group in grouped:
+        if scheduled_status == "scheduled" and group.scheduled_count <= 0:
+            continue
+        if scheduled_status == "unscheduled" and group.scheduled_count > 0:
+            continue
+        filtered.append(group)
+
+    return sorted(
+        filtered,
+        key=lambda item: (
+            item.faculty or "",
+            item.program_name or "",
+            item.course_name,
+            item.course_code,
+        ),
+    )
+
+
+def get_student_exam_schedules(db: Session, *, student_external_id: str) -> list[StudentExamScheduleItem]:
+    rows = timetable_repo.list_student_exam_schedules_with_sections(db, student_external_id)
+    teacher_ids = [section.teacher_external_id for _, section in rows if section.teacher_external_id]
+    teachers = external_user_repo.get_cached_users(db, teacher_ids, role="teacher")
+    return [
+        StudentExamScheduleItem(
+            id=exam.id,
+            section_id=section.id,
+            term_id=section.term_id,
+            term_code=section.term.term_code if section.term else None,
+            term_name=section.term.term_name if section.term else None,
+            course_code=section.course_code,
+            course_name=section.course_name,
+            section_code=section.section_code,
+            teacher_external_id=section.teacher_external_id,
+            teacher_name=teachers.get(section.teacher_external_id).full_name if section.teacher_external_id and teachers.get(section.teacher_external_id) else None,
+            exam_date=exam.exam_date,
+            start_time=exam.start_time,
+            end_time=exam.end_time,
+            room=exam.room,
+            location=exam.location,
+            exam_type=exam.exam_type,
+            note=exam.note,
+            created_at=exam.created_at,
+        )
+        for exam, section in rows
+    ]
 
 
 def create_exam_schedule(db: Session, values: dict):

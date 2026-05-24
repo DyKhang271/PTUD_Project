@@ -16,6 +16,8 @@ class CourseSection(Base):
         UniqueConstraint("term_id", "section_code", name="uq_course_sections_term_section_code"),
         Index("ix_course_sections_term_id", "term_id"),
         Index("ix_course_sections_teacher_external_id", "teacher_external_id"),
+        Index("ix_course_sections_faculty", "faculty"),
+        Index("ix_course_sections_program_name", "program_name"),
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
@@ -25,6 +27,7 @@ class CourseSection(Base):
     section_code: Mapped[str] = mapped_column(Text, nullable=False)
     teacher_external_id: Mapped[str | None] = mapped_column(Text)
     faculty: Mapped[str | None] = mapped_column(Text)
+    program_name: Mapped[str | None] = mapped_column(Text)
     student_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     total_sessions: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
