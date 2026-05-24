@@ -11,6 +11,7 @@ import TeacherSections from "./pages/teacher/TeacherSections";
 import AttendanceSessionPage from "./pages/teacher/AttendanceSessionPage";
 import AttendanceReportPage from "./pages/teacher/AttendanceReportPage";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AcademicDataPage from "./pages/admin/AcademicDataPage";
 import TermManagement from "./pages/admin/TermManagement";
 import CourseSectionManagement from "./pages/admin/CourseSectionManagement";
 import TimetableManagement from "./pages/admin/TimetableManagement";
@@ -97,11 +98,19 @@ export const router = createBrowserRouter([
             element: <AdminLayout />,
             children: [
               { path: "/admin/dashboard", element: <AdminDashboard /> },
+              { path: "/admin/academic-data", element: <AcademicDataPage /> },
               { path: "/admin/terms", element: <TermManagement /> },
-              { path: "/admin/course-sections", element: <CourseSectionManagement /> },
-              { path: "/admin/course-opening-plan", element: <CourseOpeningPlanPage /> },
-              { path: "/admin/timetable", element: <TimetableManagement /> },
-              { path: "/admin/policies", element: <AttendancePolicyPage /> },
+              { path: "/admin/sections", element: <CourseSectionManagement /> },
+              { path: "/admin/scheduling", element: <TimetableManagement /> },
+              { path: "/admin/attendance", element: <AttendancePolicyPage /> },
+              { path: "/admin/academic-data/advanced/plan", element: <CourseOpeningPlanPage /> },
+              { path: "/admin/academic-import", element: <Navigate to="/admin/academic-data" replace /> },
+              { path: "/admin/import", element: <Navigate to="/admin/academic-data" replace /> },
+              { path: "/admin/course-sections", element: <Navigate to="/admin/sections" replace /> },
+              { path: "/admin/course-opening-plan", element: <Navigate to="/admin/academic-data/advanced/plan" replace /> },
+              { path: "/admin/timetable", element: <Navigate to="/admin/scheduling" replace /> },
+              { path: "/admin/policies", element: <Navigate to="/admin/attendance" replace /> },
+              { path: "/admin/attendance-policy", element: <Navigate to="/admin/attendance" replace /> },
             ],
           },
         ],

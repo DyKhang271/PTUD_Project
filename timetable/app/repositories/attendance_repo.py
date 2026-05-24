@@ -51,6 +51,15 @@ def get_section_session_by_date_and_start_time(
     )
 
 
+def list_section_sessions(db: Session, section_id: UUID) -> list[AttendanceSession]:
+    stmt = (
+        select(AttendanceSession)
+        .where(AttendanceSession.section_id == section_id)
+        .order_by(AttendanceSession.session_date.desc(), AttendanceSession.start_time.desc().nullslast())
+    )
+    return list(db.scalars(stmt).all())
+
+
 def get_open_session_by_qr_hash(db: Session, qr_token_hash: str) -> AttendanceSession | None:
     return db.scalar(
         select(AttendanceSession).where(

@@ -20,6 +20,16 @@ export async function fetchTeacherSectionTimetable(sectionId) {
   return data;
 }
 
+export async function fetchTeacherSectionAttendanceSessions(sectionId) {
+  const { data } = await api.get(`/teacher/sections/${sectionId}/attendance-sessions`);
+  return data;
+}
+
+export async function fetchTeacherTodayClasses() {
+  const { data } = await api.get("/teacher/today-classes");
+  return data;
+}
+
 export async function createAttendanceSession(payload) {
   const { data } = await api.post("/teacher/attendance-sessions", payload);
   return data;
@@ -42,6 +52,11 @@ export async function closeAttendanceSession(sessionId) {
 
 export async function fetchAttendanceRecords(sessionId) {
   const { data } = await api.get(`/teacher/attendance-sessions/${sessionId}/records`);
+  return data;
+}
+
+export async function updateAttendanceRecordsBatch(sessionId, records) {
+  const { data } = await api.patch(`/teacher/attendance-sessions/${sessionId}/records/batch`, { records });
   return data;
 }
 

@@ -110,6 +110,32 @@ class CoreApiClient:
     def get_source_terms(self) -> dict[str, Any]:
         return self._request("GET", "/internal/source-terms")
 
+    def get_academic_scheduling_source(
+        self,
+        *,
+        term_code: str,
+        program_name: str | None = None,
+        program_id: str | None = None,
+        cohort: str | None = None,
+        curriculum_semester: int,
+        strict_curriculum_match: bool = False,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "term_code": term_code,
+            "curriculum_semester": curriculum_semester,
+            "strict_curriculum_match": strict_curriculum_match,
+        }
+        if program_name is not None:
+            params["program_name"] = program_name
+        if program_id is not None:
+            params["program_id"] = program_id
+        if cohort is not None:
+            params["cohort"] = cohort
+        return self._request("GET", "/internal/academic-scheduling-source", params=params)
+
+    def get_academic_scheduling_options(self) -> dict[str, Any]:
+        return self._request("GET", "/internal/academic-scheduling-options")
+
     def get_faculties(self) -> dict[str, Any]:
         return self._request("GET", "/internal/faculties")
 

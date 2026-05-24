@@ -9,8 +9,13 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import require_role
+from app.core.dependencies import CurrentUser, require_role
 from app.schemas.import_schema import (
+    AcademicSchedulingSourceImportRequest,
+    AcademicSchedulingSourceImportResponse,
+    AcademicImportBatchDetailRead,
+    AcademicImportBatchRead,
+    AcademicSchedulingOptionsResponse,
     ImportDebugSummaryResponse,
     ImportFromCoreRequest,
     ImportFromCoreResponse,
@@ -20,7 +25,8 @@ from app.schemas.import_schema import (
     TimetableEntriesImportResponse,
 )
 from app.schemas.section_schema import CoreCourseSectionsImportRequest, CoreCourseSectionsImportResponse
-from app.services import import_service, section_service
+from app.services import academic_scheduling_import_service, import_service, section_service
+from app.services.core_api_client import CoreApiClient
 
 router = APIRouter(prefix="/admin/import", tags=["admin-import"], dependencies=[Depends(require_role(["admin"]))])
 CSV_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "seed_data" / "timetable_entries.sample.csv"
@@ -34,6 +40,32 @@ def seed_from_core(payload: ImportFromCoreRequest, db: Annotated[Session, Depend
 @router.post("/core-sections", response_model=CoreCourseSectionsImportResponse)
 def import_core_sections(payload: CoreCourseSectionsImportRequest, db: Annotated[Session, Depends(get_db)]):
     return section_service.import_course_sections_from_core(db, payload.model_dump(exclude_none=True))
+
+
+@router.post("/academic-scheduling-source", response_model=AcademicSchedulingSourceImportResponse)
+def import_academic_scheduling_source(
+    payload: AcademicSchedulingSourceImportRequest,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[CurrentUser, Depends(require_role(["admin"]))],
+):
+    values = payload.model_dump(exclude_none=True)
+    values["imported_by"] = current_user.external_id
+    return academic_scheduling_import_service.import_academic_scheduling_source(db, values)
+
+
+@router.get("/academic-batches", response_model=list[AcademicImportBatchRead])
+def list_academic_import_batches(db: Annotated[Session, Depends(get_db)]):
+    return academic_scheduling_import_service.list_import_batches(db)
+
+
+@router.get("/academic-batches/{batch_id}", response_model=AcademicImportBatchDetailRead)
+def get_academic_import_batch(batch_id: UUID, db: Annotated[Session, Depends(get_db)]):
+    return academic_scheduling_import_service.get_import_batch_detail(db, batch_id)
+
+
+@router.get("/academic-scheduling-options", response_model=AcademicSchedulingOptionsResponse)
+def get_academic_scheduling_options():
+    return CoreApiClient().get_academic_scheduling_options()
 
 
 @router.get("/debug-summary", response_model=ImportDebugSummaryResponse)

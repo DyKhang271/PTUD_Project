@@ -5,8 +5,10 @@ import re
 import secrets
 from collections import OrderedDict
 
+import jwt
 from fastapi import HTTPException, status
 
+from auth_tokens import decode_token
 import student_data_store as store
 
 DEFAULT_INTERNAL_API_KEY = "dev-internal-secret"
@@ -89,6 +91,29 @@ def _normalize_admin(admin_id: str, admin: dict | None) -> dict | None:
 
 def verify_external_token(token: str) -> dict:
     raw_token = (token or "").strip()
+    if not raw_token:
+        return {"valid": False}
+
+    if "." in raw_token:
+        try:
+            payload = decode_token(raw_token, expected_type="access")
+        except jwt.PyJWTError:
+            return {"valid": False}
+
+        role = str(payload.get("role") or "").strip().lower()
+        user_id = str(payload.get("sub") or "").strip()
+        if not role or not user_id:
+            return {"valid": False}
+
+        claims = {
+            "full_name": payload.get("full_name"),
+            "email": payload.get("email"),
+            "class_name": payload.get("class_name"),
+            "faculty": payload.get("faculty"),
+            "program_name": payload.get("program_name"),
+        }
+        return {"valid": True, "user_id": user_id, "role": role, **claims}
+
     if ":" not in raw_token:
         return {"valid": False}
 

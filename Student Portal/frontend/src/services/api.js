@@ -142,11 +142,7 @@ export const updateAdminNotification = (id, data) => api.put(`/admin/notificatio
 export const deleteAdminNotification = (id) => api.delete(`/admin/notifications/${id}`);
 
 export const timetableAdminLogin = async (username, password) => {
-  const response = await timetableApi.post('/auth/login', {
-    role: 'admin',
-    username,
-    password,
-  });
+  const response = await adminLogin(username, password);
   setTimetableAccessToken(response.data?.access_token);
   return response;
 };

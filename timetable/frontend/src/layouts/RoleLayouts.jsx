@@ -4,21 +4,21 @@ const studentLinks = [
   { to: "/student/dashboard", label: "Dashboard" },
   { to: "/student/timetable", label: "Thoi khoa bieu" },
   { to: "/student/exams", label: "Lich thi" },
-  { to: "/student/attendance", label: "Diem danh" },
+  { to: "/student/attendance", label: "Lich su diem danh" },
 ];
 
 const teacherLinks = [
   { to: "/teacher/dashboard", label: "Dashboard" },
-  { to: "/teacher/sections", label: "Lop phu trach" },
+  { to: "/teacher/sections", label: "Diem danh" },
 ];
 
 const adminLinks = [
   { to: "/admin/dashboard", label: "Dashboard" },
+  { to: "/admin/academic-data", label: "Du lieu hoc vu" },
   { to: "/admin/terms", label: "Hoc ky" },
-  { to: "/admin/course-sections", label: "Dong bo du lieu" },
-  { to: "/admin/course-opening-plan", label: "Ke hoach mo lop" },
-  { to: "/admin/timetable", label: "Lich hoc & thi" },
-  { to: "/admin/policies", label: "Policy diem danh" },
+  { to: "/admin/sections", label: "Lop hoc phan" },
+  { to: "/admin/scheduling", label: "Lich hoc & thi" },
+  { to: "/admin/attendance", label: "Diem danh" },
 ];
 
 export function StudentLayout() {

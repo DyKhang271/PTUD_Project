@@ -5,6 +5,7 @@ from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
 
+from auth_tokens import hash_password, is_password_hashed, verify_password
 from grade_logic import (
     build_course_grade,
     classify_academic_standing,
@@ -166,6 +167,34 @@ def _reset_runtime_defaults() -> None:
     SYSTEM_CONFIG = deepcopy(DEFAULT_SYSTEM_CONFIG)
     SCHEDULE_DB = deepcopy(DEFAULT_SCHEDULE_DB)
     NOTIFICATIONS_DB = deepcopy(DEFAULT_NOTIFICATIONS_DB)
+
+
+def _hash_password_fields() -> bool:
+    changed = False
+
+    for user in ADMIN_USERS.values():
+        password = user.get("password")
+        if password and not is_password_hashed(password):
+            user["password"] = hash_password(password)
+            changed = True
+
+    for user in TEACHER_USERS.values():
+        password = user.get("password")
+        if password and not is_password_hashed(password):
+            user["password"] = hash_password(password)
+            changed = True
+
+    for metadata in ACCOUNT_METADATA.values():
+        password = metadata.get("password")
+        if password and not is_password_hashed(password):
+            metadata["password"] = hash_password(password)
+            changed = True
+
+    return changed
+
+
+def _build_demo_password_hint(identifier: str) -> str:
+    return identifier
 
 
 def _resolve_data_files() -> list[Path]:
@@ -555,6 +584,8 @@ def _ensure_loaded() -> None:
         mssv: _build_public_record(raw_record)
         for mssv, raw_record in RAW_STUDENT_DB.items()
     }
+    if _hash_password_fields():
+        _persist_runtime_state()
 
 
 def initialize_store() -> None:
@@ -676,7 +707,7 @@ def get_available_accounts() -> list[dict]:
             {
                 "mssv": mssv,
                 "ho_ten": ho_ten,
-                "password": meta["password"],
+                "password_hint": _build_demo_password_hint(mssv),
                 "ngay_sinh": meta["ngay_sinh"],
                 "sdt": meta.get("sdt", ""),
             }
@@ -689,7 +720,7 @@ def get_available_teacher_accounts() -> list[dict]:
     return [
         {
             "username": username,
-            "password": teacher["password"],
+            "password_hint": _build_demo_password_hint(username),
             "name": teacher["name"],
             "department": teacher["department"],
             "courses": [assignment["course_name"] for assignment in teacher["assignments"]],
@@ -700,14 +731,14 @@ def get_available_teacher_accounts() -> list[dict]:
 
 def validate_admin_login(username: str, password: str):
     user = ADMIN_USERS.get(username)
-    if user and user["password"] == password:
+    if user and verify_password(password, user.get("password")):
         return user
     return None
 
 
 def validate_teacher_login(username: str, password: str):
     teacher = TEACHER_USERS.get(username)
-    if teacher and teacher["password"] == password:
+    if teacher and verify_password(password, teacher.get("password")):
         return {
             "username": username,
             "name": teacher["name"],
@@ -741,7 +772,7 @@ def add_new_student(mssv, password, ho_ten="Sinh viên mới", ngay_sinh="01/01/
         return False, "MSSV đã tồn tại"
 
     ACCOUNT_METADATA[mssv] = {
-        "password": password,
+        "password": hash_password(password),
         "ngay_sinh": ngay_sinh,
         "gioi_tinh": "Nam",
         "khoa_hoc": "2024-2028",
@@ -776,7 +807,7 @@ def change_student_password(mssv, new_password):
     _ensure_loaded()
     if mssv not in ACCOUNT_METADATA:
         return False, "Không tìm thấy sinh viên"
-    ACCOUNT_METADATA[mssv]["password"] = new_password
+    ACCOUNT_METADATA[mssv]["password"] = hash_password(new_password)
     _persist_runtime_state()
     return True, "Đổi mật khẩu thành công"
 
@@ -801,7 +832,7 @@ def add_new_teacher(username, password, name, department, title):
         return False, "Tài khoản giảng viên đã tồn tại"
 
     TEACHER_USERS[username] = {
-        "password": password,
+        "password": hash_password(password),
         "name": name,
         "department": department,
         "title": title,
@@ -815,7 +846,7 @@ def change_teacher_password(username, new_password):
     _ensure_loaded()
     if username not in TEACHER_USERS:
         return False, "Không tìm thấy giảng viên"
-    TEACHER_USERS[username]["password"] = new_password
+    TEACHER_USERS[username]["password"] = hash_password(new_password)
     _persist_runtime_state()
     return True, "Đổi mật khẩu giảng viên thành công"
 
@@ -844,7 +875,7 @@ def validate_student_login(mssv: str, password: str) -> dict | None:
     records = get_student_records()
     if mssv not in records:
         return None
-    if ACCOUNT_METADATA[mssv]["password"] != password:
+    if not verify_password(password, ACCOUNT_METADATA[mssv].get("password")):
         return None
     return records[mssv]["student"]
 
@@ -1290,7 +1321,7 @@ def bulk_add_students(students: list[dict]) -> tuple[bool, str]:
             continue
         
         ACCOUNT_METADATA[mssv] = {
-            "password": st.get("password") or st.get("mssv"),
+            "password": hash_password(st.get("password") or st.get("mssv")),
             "ngay_sinh": st.get("ngay_sinh", "01/01/2000"),
             "gioi_tinh": st.get("gioi_tinh", "Nam"),
             "khoa_hoc": st.get("khoa_hoc", "2024-2028"),
@@ -1355,7 +1386,7 @@ def bulk_add_teachers(teachers: list[dict]) -> tuple[bool, str]:
             continue
             
         TEACHER_USERS[username] = {
-            "password": t.get("password") or t.get("username"),
+            "password": hash_password(t.get("password") or t.get("username")),
             "name": t.get("name", "Giảng viên"),
             "department": t.get("department", "Bộ môn chung"),
             "title": t.get("title", "Giảng viên"),

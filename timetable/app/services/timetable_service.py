@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.course_section import CourseSection, CourseSectionStudent
+from app.models.scheduling_constraints import Room, SectionSchedulingRequirement, TeacherAvailability
 from app.models.timetable import TimetableEntry
 from app.repositories import external_user_repo, timetable_repo
 from app.schemas.timetable_schema import StudentTimetableItem, TeacherTimetableItem
@@ -297,6 +298,84 @@ def _check_section_conflict(
     return None
 
 
+def _get_room_by_code(db: Session, room_code: str | None) -> Room | None:
+    normalized_room_code = str(room_code or "").strip()
+    if not normalized_room_code:
+        return None
+    return db.scalar(select(Room).where(Room.room_code == normalized_room_code, Room.active.is_(True)))
+
+
+def _get_section_requirement(db: Session, section_id: UUID) -> SectionSchedulingRequirement | None:
+    return db.scalar(select(SectionSchedulingRequirement).where(SectionSchedulingRequirement.section_id == section_id))
+
+
+def _teacher_is_unavailable(
+    db: Session,
+    *,
+    teacher_external_id: str | None,
+    term_id: UUID | None,
+    day_of_week: int,
+    start_period: int,
+    end_period: int,
+) -> bool:
+    if not teacher_external_id or not term_id:
+        return False
+    rows = db.scalars(
+        select(TeacherAvailability).where(
+            TeacherAvailability.teacher_external_id == teacher_external_id,
+            TeacherAvailability.term_id == term_id,
+            TeacherAvailability.day_of_week == day_of_week,
+        )
+    ).all()
+    for row in rows:
+        overlaps = start_period <= row.end_period and end_period >= row.start_period
+        if overlaps and row.availability_type == "unavailable":
+            return True
+    return False
+
+
+def _validate_constraint_foundation(db: Session, *, section: CourseSection, values: dict) -> None:
+    start_period = values.get("start_period")
+    end_period = values.get("end_period")
+    if start_period is None or end_period is None:
+        return
+
+    requirement = _get_section_requirement(db, section.id)
+    room = _get_room_by_code(db, values.get("room"))
+
+    if _teacher_is_unavailable(
+        db,
+        teacher_external_id=section.teacher_external_id,
+        term_id=section.term_id,
+        day_of_week=values["day_of_week"],
+        start_period=start_period,
+        end_period=end_period,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Teacher is unavailable in the requested time range",
+        )
+
+    expected_students = requirement.expected_students if requirement and requirement.expected_students is not None else section.student_count
+    if room and expected_students and room.capacity is not None and room.capacity < expected_students:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Room capacity is smaller than section student count",
+        )
+
+    if requirement and requirement.required_room_type:
+        if room is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Room is not registered for the required scheduling constraint",
+            )
+        if room.room_type != requirement.required_room_type:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Room type does not satisfy section scheduling requirement",
+            )
+
+
 def _validate_conflicts(
     db: Session,
     *,
@@ -382,6 +461,8 @@ def _validate_conflicts(
                 f"{conflict_count} sinh vien bi trung lich voi lop hoc phan {conflicting_section.section_code}."
             ),
         )
+
+    _validate_constraint_foundation(db, section=section, values=values)
 
 
 def create_timetable_entry(db: Session, values: dict):

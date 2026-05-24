@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 import jwt
@@ -35,25 +35,28 @@ def generate_qr_token() -> str:
     return secrets.token_urlsafe(32)
 
 
-def create_access_token(*, external_id: str, role: str, full_name: str | None = None) -> str:
+def _get_portal_jwt_verification_key() -> str:
     settings = get_settings()
-    now = utc_now()
-    payload: dict[str, Any] = {
-        "sub": external_id,
-        "role": role,
-        "full_name": full_name,
-        "iat": int(now.timestamp()),
-        "exp": int((now + timedelta(minutes=settings.access_token_expire_minutes)).timestamp()),
-    }
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
+    if settings.portal_jwt_algorithm.upper().startswith("RS"):
+        if not settings.portal_jwt_public_key:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Portal JWT public key is missing")
+        return settings.portal_jwt_public_key
+    return settings.portal_jwt_secret
 
 
-def decode_access_token(token: str) -> dict[str, Any]:
+def decode_portal_access_token(token: str) -> dict[str, Any]:
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            token,
+            _get_portal_jwt_verification_key(),
+            algorithms=[settings.portal_jwt_algorithm],
+            issuer=settings.portal_jwt_issuer,
+        )
+        if payload.get("type") and payload.get("type") != "access":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token type")
+        return payload
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Access token has expired") from exc
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token") from exc
-

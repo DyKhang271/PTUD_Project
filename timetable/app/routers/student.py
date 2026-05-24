@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, require_role
-from app.repositories import attendance_repo, section_repo, timetable_repo
+from app.repositories import attendance_repo, external_user_repo, section_repo, timetable_repo
 from app.schemas.attendance_schema import (
     AttendanceHistoryItem,
     AttendanceRecordRead,
@@ -74,13 +74,26 @@ def my_exams_legacy(current_user: StudentUser, db: Annotated[Session, Depends(ge
 @router.get("/attendance", response_model=list[AttendanceHistoryItem])
 def my_attendance(current_user: StudentUser, db: Annotated[Session, Depends(get_db)]) -> list[AttendanceHistoryItem]:
     rows = attendance_repo.list_student_attendance_history(db, current_user.external_id)
+    teacher_ids = [section.teacher_external_id for _, _, section in rows if section.teacher_external_id]
+    teachers = external_user_repo.get_cached_users(db, teacher_ids, role="teacher")
     return [
         AttendanceHistoryItem(
             session_id=session.id,
             section_id=section.id,
+            term=section.term.term_name if section.term else None,
             course_code=section.course_code,
             course_name=section.course_name,
             section_code=section.section_code,
+            teacher_name=(
+                teachers.get(section.teacher_external_id).full_name
+                if section.teacher_external_id and teachers.get(section.teacher_external_id)
+                else section.teacher_external_id
+            ),
+            datetime=(
+                datetime.combine(session.session_date, session.start_time)
+                if session.session_date and session.start_time
+                else None
+            ),
             session_date=session.session_date,
             start_time=session.start_time,
             end_time=session.end_time,
@@ -88,6 +101,7 @@ def my_attendance(current_user: StudentUser, db: Annotated[Session, Depends(get_
             checkin_time=record.checkin_time,
             method=record.method,
             note=record.note,
+            updated_at=record.updated_at,
         )
         for record, session, section in rows
     ]

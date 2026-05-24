@@ -16,6 +16,10 @@ def _load_dotenv() -> None:
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
+def _normalize_multiline_env(value: str) -> str:
+    return value.replace("\\n", "\n")
+
+
 @dataclass(frozen=True)
 class Settings:
     app_name: str
@@ -25,8 +29,10 @@ class Settings:
     core_api_key: str
     core_api_timeout_seconds: float
     secret_key: str
-    jwt_algorithm: str
-    access_token_expire_minutes: int
+    portal_jwt_secret: str
+    portal_jwt_public_key: str
+    portal_jwt_issuer: str
+    portal_jwt_algorithm: str
     checkin_expire_minutes: int
     allowed_origins: str
 
@@ -49,8 +55,10 @@ def get_settings() -> Settings:
         core_api_key=os.getenv("CORE_API_KEY", "dev-internal-secret"),
         core_api_timeout_seconds=float(os.getenv("CORE_API_TIMEOUT_SECONDS", "10")),
         secret_key=os.getenv("SECRET_KEY", "change-me-in-production"),
-        jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
-        access_token_expire_minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "240")),
+        portal_jwt_secret=os.getenv("PORTAL_JWT_SECRET", os.getenv("SECRET_KEY", "student-portal-dev-secret")),
+        portal_jwt_public_key=_normalize_multiline_env(os.getenv("PORTAL_JWT_PUBLIC_KEY", "")),
+        portal_jwt_issuer=os.getenv("PORTAL_JWT_ISSUER", "student-portal"),
+        portal_jwt_algorithm=os.getenv("PORTAL_JWT_ALGORITHM", "HS256"),
         checkin_expire_minutes=int(os.getenv("CHECKIN_EXPIRE_MINUTES", "15")),
         allowed_origins=os.getenv(
             "ALLOWED_ORIGINS",

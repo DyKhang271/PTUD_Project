@@ -27,7 +27,8 @@ export default function TeacherSections() {
   return (
     <div className="table-card">
       <div className="page-header">
-        <h2 className="page-title">Lớp học phần phụ trách</h2>
+        <h2 className="page-title">Điểm danh</h2>
+        <p className="page-subtitle">Chọn lớp học phần để tạo hoặc tiếp tục phiên điểm danh thủ công.</p>
       </div>
       <table>
         <thead>
@@ -35,7 +36,7 @@ export default function TeacherSections() {
             <th>Mã môn</th>
             <th>Tên môn</th>
             <th>Lớp HP</th>
-            <th>Giảng viên</th>
+            <th>Số sinh viên</th>
             <th>Thao tác</th>
           </tr>
         </thead>
@@ -45,10 +46,10 @@ export default function TeacherSections() {
               <td>{section.course_code}</td>
               <td>{section.course_name}</td>
               <td>{section.section_code}</td>
-              <td>{section.teacher_external_id || "--"}</td>
+              <td>{section.student_count || "--"}</td>
               <td>
                 <div className="table-actions">
-                  <Link className="secondary-button" to={`/teacher/sections/${section.id}/attendance`}>
+                  <Link className="primary-button" to={`/teacher/sections/${section.id}/attendance`}>
                     Điểm danh
                   </Link>
                   <Link className="secondary-button" to={`/teacher/sections/${section.id}/report`}>

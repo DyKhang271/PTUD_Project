@@ -12,7 +12,7 @@ from app.core.security import generate_checkin_code, generate_qr_token, hash_sec
 from app.models.attendance import AttendanceRecord, AttendanceSession
 from app.models.timetable import TimetableEntry
 from app.repositories import attendance_repo, external_user_repo, policy_repo, section_repo
-from app.schemas.attendance_schema import AttendanceRecordRead, AttendanceSummaryItem, OpenAttendanceSessionResponse
+from app.schemas.attendance_schema import AttendanceRecordBatchUpdateItem, AttendanceRecordRead, AttendanceSummaryItem, OpenAttendanceSessionResponse
 from app.services.section_service import get_section_or_404
 
 VALID_ATTENDANCE_STATUSES = {"present", "late", "absent", "excused"}
@@ -197,6 +197,37 @@ def update_record_manual_by_id(
         note=note,
         current_user=current_user,
     )
+
+
+def update_records_manual_batch(
+    db: Session,
+    *,
+    session_id: UUID,
+    records: list[AttendanceRecordBatchUpdateItem],
+    current_user: CurrentUser,
+) -> list[AttendanceRecordRead]:
+    session = _get_session_or_404(db, session_id)
+    _ensure_teacher_can_access_session(db, session, current_user)
+    now = utc_now()
+    for item in records:
+        if item.status not in VALID_ATTENDANCE_STATUSES:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid attendance status")
+        if not section_repo.is_student_in_section(db, section_id=session.section_id, student_external_id=item.student_id):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Student is not enrolled in this section")
+        attendance_repo.upsert_attendance_record(
+            db,
+            session_id=session.id,
+            student_external_id=item.student_id,
+            values={
+                "status": item.status,
+                "method": "manual",
+                "note": item.note,
+                "updated_by_external_id": current_user.external_id,
+                "updated_at": now,
+            },
+        )
+    db.commit()
+    return list_session_records_enriched(db, session_id=session.id, current_user=current_user)
 
 
 def list_session_records_enriched(db: Session, *, session_id: UUID, current_user: CurrentUser) -> list[AttendanceRecordRead]:

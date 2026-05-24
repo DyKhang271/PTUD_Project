@@ -10,6 +10,17 @@ from app.repositories import policy_repo, section_repo, timetable_repo
 from app.schemas.course_opening_plan_schema import CohortRead, CourseOpeningPlanResponse, FacultyRead, ProgramRead
 from app.schemas.policy_schema import AttendancePolicyCreate, AttendancePolicyRead, AttendancePolicyUpdate
 from app.schemas.report_schema import AttendanceDashboard, AttendanceGroupSummary
+from app.schemas.scheduling_constraints_schema import (
+    RoomCreate,
+    RoomRead,
+    RoomUpdate,
+    SectionSchedulingRequirementCreate,
+    SectionSchedulingRequirementRead,
+    SectionSchedulingRequirementUpdate,
+    TeacherAvailabilityCreate,
+    TeacherAvailabilityRead,
+    TeacherAvailabilityUpdate,
+)
 from app.schemas.section_schema import (
     CoreCourseSectionsImportRequest,
     CoreCourseSectionsImportResponse,
@@ -33,7 +44,14 @@ from app.schemas.timetable_schema import (
     TimetableEntryRead,
     TimetableEntryUpdate,
 )
-from app.services import course_opening_plan_service, policy_service, report_service, section_service, timetable_service
+from app.services import (
+    course_opening_plan_service,
+    policy_service,
+    report_service,
+    scheduling_constraints_service,
+    section_service,
+    timetable_service,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_role(["admin"]))])
 
@@ -255,3 +273,52 @@ def attendance_by_course(db: Annotated[Session, Depends(get_db)]):
 @router.get("/attendance/by-faculty", response_model=list[AttendanceGroupSummary])
 def attendance_by_faculty(db: Annotated[Session, Depends(get_db)]):
     return report_service.summarize_by_faculty(db)
+
+
+@router.get("/rooms", response_model=list[RoomRead])
+def list_rooms(db: Annotated[Session, Depends(get_db)]):
+    return scheduling_constraints_service.list_rooms(db)
+
+
+@router.post("/rooms", response_model=RoomRead, status_code=status.HTTP_201_CREATED)
+def create_room(payload: RoomCreate, db: Annotated[Session, Depends(get_db)]):
+    return scheduling_constraints_service.create_room(db, payload.model_dump())
+
+
+@router.put("/rooms/{room_id}", response_model=RoomRead)
+def update_room(room_id: UUID, payload: RoomUpdate, db: Annotated[Session, Depends(get_db)]):
+    return scheduling_constraints_service.update_room(db, room_id, payload.model_dump(exclude_unset=True))
+
+
+@router.get("/teacher-availability", response_model=list[TeacherAvailabilityRead])
+def list_teacher_availability(
+    db: Annotated[Session, Depends(get_db)],
+    term_id: UUID | None = None,
+    teacher_external_id: str | None = None,
+):
+    return scheduling_constraints_service.list_teacher_availability(db, term_id=term_id, teacher_external_id=teacher_external_id)
+
+
+@router.post("/teacher-availability", response_model=TeacherAvailabilityRead, status_code=status.HTTP_201_CREATED)
+def create_teacher_availability(payload: TeacherAvailabilityCreate, db: Annotated[Session, Depends(get_db)]):
+    return scheduling_constraints_service.create_teacher_availability(db, payload.model_dump())
+
+
+@router.put("/teacher-availability/{availability_id}", response_model=TeacherAvailabilityRead)
+def update_teacher_availability(availability_id: UUID, payload: TeacherAvailabilityUpdate, db: Annotated[Session, Depends(get_db)]):
+    return scheduling_constraints_service.update_teacher_availability(db, availability_id, payload.model_dump(exclude_unset=True))
+
+
+@router.get("/section-scheduling-requirements", response_model=list[SectionSchedulingRequirementRead])
+def list_section_scheduling_requirements(db: Annotated[Session, Depends(get_db)], section_id: UUID | None = None):
+    return scheduling_constraints_service.list_section_requirements(db, section_id=section_id)
+
+
+@router.post("/section-scheduling-requirements", response_model=SectionSchedulingRequirementRead, status_code=status.HTTP_201_CREATED)
+def upsert_section_scheduling_requirement(payload: SectionSchedulingRequirementCreate, db: Annotated[Session, Depends(get_db)]):
+    return scheduling_constraints_service.upsert_section_requirement(db, payload.model_dump())
+
+
+@router.put("/section-scheduling-requirements/{requirement_id}", response_model=SectionSchedulingRequirementRead)
+def update_section_scheduling_requirement(requirement_id: UUID, payload: SectionSchedulingRequirementUpdate, db: Annotated[Session, Depends(get_db)]):
+    return scheduling_constraints_service.update_section_requirement(db, requirement_id, payload.model_dump(exclude_unset=True))

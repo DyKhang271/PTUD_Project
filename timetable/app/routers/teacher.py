@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser, ensure_teacher_owns_section, require_role
 from app.models.course_section import CourseSection
-from app.repositories import section_repo, timetable_repo
+from app.repositories import attendance_repo, section_repo, timetable_repo
 from app.schemas.attendance_schema import (
+    AttendanceRecordBatchUpdate,
     AttendanceRecordRead,
     AttendanceRecordUpdate,
     AttendanceSessionCreate,
@@ -55,6 +56,14 @@ def section_timetable(
     db: Annotated[Session, Depends(get_db)],
 ) -> list:
     return timetable_repo.list_timetable_entries(db, section_id=section.id)
+
+
+@router.get("/sections/{section_id}/attendance-sessions", response_model=list[AttendanceSessionRead])
+def section_attendance_sessions(
+    section: Annotated[CourseSection, Depends(ensure_teacher_owns_section)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list:
+    return attendance_repo.list_section_sessions(db, section.id)
 
 
 @router.get("/timetable", response_model=list[TeacherTimetableItem])
@@ -103,6 +112,15 @@ def create_attendance_session_alias(
 @router.get("/attendance-sessions/{session_id}", response_model=AttendanceSessionRead)
 def attendance_session_detail(session_id: UUID, current_user: TeacherOrAdminUser, db: Annotated[Session, Depends(get_db)]):
     return attendance_service.get_session_detail(db, session_id=session_id, current_user=current_user)
+
+
+@router.get("/attendance-sessions/{session_id}/bundle")
+def attendance_session_bundle(session_id: UUID, current_user: TeacherOrAdminUser, db: Annotated[Session, Depends(get_db)]):
+    session = attendance_service.get_session_detail(db, session_id=session_id, current_user=current_user)
+    section = section_repo.get_section(db, session.section_id)
+    students = section_service.list_section_students_enriched(db, session.section_id)
+    records = attendance_service.list_session_records_enriched(db, session_id=session.id, current_user=current_user)
+    return {"session": session, "section": section, "enrolled_students": students, "attendance_records": records}
 
 
 @router.post("/attendance-sessions/{session_id}/open", response_model=OpenAttendanceSessionResponse)
@@ -156,6 +174,21 @@ def update_attendance_record(
         student_external_id=student_external_id,
         status_value=payload.status,
         note=payload.note,
+        current_user=current_user,
+    )
+
+
+@router.patch("/attendance-sessions/{session_id}/records/batch", response_model=list[AttendanceRecordRead])
+def update_attendance_records_batch(
+    session_id: UUID,
+    payload: AttendanceRecordBatchUpdate,
+    current_user: TeacherOrAdminUser,
+    db: Annotated[Session, Depends(get_db)],
+):
+    return attendance_service.update_records_manual_batch(
+        db,
+        session_id=session_id,
+        records=payload.records,
         current_user=current_user,
     )
 

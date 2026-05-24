@@ -10,10 +10,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import decode_access_token
+from app.core.security import decode_portal_access_token
 from app.models.course_section import CourseSection
+from app.repositories.external_user_repo import upsert_external_user
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/student-login")
 
 
 @dataclass(frozen=True)
@@ -21,15 +22,35 @@ class CurrentUser:
     external_id: str
     role: str
     full_name: str | None = None
+    email: str | None = None
 
 
-def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> CurrentUser:
-    payload = decode_access_token(token)
+def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: Annotated[Session, Depends(get_db)],
+) -> CurrentUser:
+    payload = decode_portal_access_token(token)
     external_id = payload.get("sub")
     role = payload.get("role")
     if not external_id or not role:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token payload")
-    return CurrentUser(external_id=str(external_id), role=str(role), full_name=payload.get("full_name"))
+    upsert_external_user(
+        db,
+        external_user_id=str(external_id),
+        role=str(role),
+        full_name=payload.get("full_name"),
+        email=payload.get("email"),
+        class_name=payload.get("class_name"),
+        faculty=payload.get("faculty"),
+        program_name=payload.get("program_name"),
+    )
+    db.commit()
+    return CurrentUser(
+        external_id=str(external_id),
+        role=str(role),
+        full_name=payload.get("full_name"),
+        email=payload.get("email"),
+    )
 
 
 def require_role(allowed_roles: list[str]) -> Callable[[CurrentUser], CurrentUser]:

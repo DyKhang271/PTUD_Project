@@ -134,13 +134,13 @@ export default function Login() {
 
   const fillStudentAccount = (account) => {
     setMssv(account.mssv);
-    setPassword(account.password);
+    setPassword(account.password_hint || account.mssv);
     setError('');
   };
 
   const fillTeacherAccount = (teacher) => {
     setTeacherUsername(teacher.username);
-    setTeacherPassword(teacher.password);
+    setTeacherPassword(teacher.password_hint || teacher.username);
     setError('');
   };
 
@@ -358,7 +358,7 @@ export default function Login() {
                 <div className={styles.loginHint}>
                   <strong>Tài khoản demo</strong>
                   <div className={styles.accountList}>
-                    {[...accounts, { mssv: 'admin', password: 'admin', ho_ten: 'Quản trị viên hệ thống' }].map((account) => (
+                    {[...accounts, { mssv: 'admin', password_hint: 'admin', ho_ten: 'Quản trị viên hệ thống' }].map((account) => (
                       <button
                         key={account.mssv}
                         type="button"
@@ -367,7 +367,7 @@ export default function Login() {
                       >
                         <span className={styles.accountName}>{account.ho_ten}</span>
                         <span className={styles.accountMeta}>
-                          {account.mssv === 'admin' ? 'Tài khoản: admin' : account.mssv} • mật khẩu: {account.password}
+                          {account.mssv === 'admin' ? 'Tài khoản: admin' : account.mssv} • mật khẩu demo: {account.password_hint || account.mssv}
                         </span>
                       </button>
                     ))}
@@ -447,7 +447,7 @@ export default function Login() {
                           {teacher.username} • {teacher.department}
                         </span>
                         <span className={styles.accountCourses}>
-                          {teacher.courses.join(' • ')}
+                          Mật khẩu demo: {teacher.password_hint || teacher.username} • {teacher.courses.join(' • ')}
                         </span>
                       </button>
                     ))}

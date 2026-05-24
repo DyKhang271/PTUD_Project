@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date as DateType
-from datetime import time
+from datetime import datetime, time
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -110,6 +110,103 @@ class SourceTermsResponse(BaseModel):
     terms: list[SourceTermRead]
     latest_term_code: str | None = None
     total: int
+
+
+class AcademicSchedulingSourceImportRequest(BaseModel):
+    term_code: str = Field(min_length=1)
+    program_name: str | None = None
+    program_id: str | None = None
+    cohort: str | None = None
+    curriculum_semester: int | None = Field(default=None, ge=1)
+    strict_curriculum_match: bool = False
+
+
+class AcademicSchedulingImportedSectionRead(BaseModel):
+    section_code: str
+    course_code: str
+    course_name: str
+    teacher_external_id: str | None = None
+    teacher_full_name: str | None = None
+    student_count: int = 0
+    status: str
+
+
+class AcademicSchedulingSourceDebugRead(BaseModel):
+    selected_program_name: str | None = None
+    selected_cohort: str | None = None
+    selected_term_code: str | None = None
+    selected_curriculum_semester: int | None = None
+    strict_curriculum_match: bool = False
+    matched_students_by_program: int = 0
+    matched_students_by_cohort: int = 0
+    matched_students_final: int = 0
+    transcript_courses_in_term: int = 0
+    imported_courses_count: int = 0
+    curriculum_courses_in_selected_semester: int = 0
+    overlap_course_codes: list[str] = Field(default_factory=list)
+    transcript_only_course_codes: list[str] = Field(default_factory=list)
+    curriculum_only_course_codes: list[str] = Field(default_factory=list)
+    available_program_names: list[str] = Field(default_factory=list)
+    available_cohorts: list[str] = Field(default_factory=list)
+    available_terms: list[str] = Field(default_factory=list)
+    available_curriculum_semesters: list[int] = Field(default_factory=list)
+
+
+class AcademicSchedulingOptionRead(BaseModel):
+    value: str
+    label: str
+
+
+class AcademicSchedulingProgramOptionRead(BaseModel):
+    name: str
+    cohorts: list[str] = Field(default_factory=list)
+
+
+class AcademicSchedulingOptionsResponse(BaseModel):
+    terms: list[AcademicSchedulingOptionRead] = Field(default_factory=list)
+    programs: list[AcademicSchedulingProgramOptionRead] = Field(default_factory=list)
+
+
+class AcademicSchedulingSourceImportResponse(BaseModel):
+    batch_id: str
+    status: str
+    term_code: str
+    program_name: str | None = None
+    cohort: str | None = None
+    curriculum_semester: int
+    imported_terms: int
+    sections_created: int
+    sections_updated: int
+    students_created_or_reactivated: int
+    teachers_upserted: int
+    total_sections: int
+    total_students: int
+    warnings: list[str] = Field(default_factory=list)
+    summary: dict[str, int] = Field(default_factory=dict)
+    debug: AcademicSchedulingSourceDebugRead | None = None
+    sections: list[AcademicSchedulingImportedSectionRead]
+
+
+class AcademicImportBatchRead(BaseModel):
+    id: str
+    term_code: str
+    program_name: str | None = None
+    cohort: str | None = None
+    curriculum_semester: int
+    imported_at: datetime
+    status: str
+    section_count: int
+    student_count: int
+    teacher_count: int
+    warnings: list[str] = Field(default_factory=list)
+    debug: AcademicSchedulingSourceDebugRead | None = None
+
+
+class AcademicImportBatchDetailRead(AcademicImportBatchRead):
+    source: str
+    imported_by: str | None = None
+    snapshot: dict | None = None
+    error_message: str | None = None
 
 
 class TimetableEntriesImportItem(BaseModel):

@@ -1,4 +1,11 @@
-import { api, getAuthStorageKey } from "./api";
+import { getAuthStorageKey, portalApi } from "./api";
+import { mapLoginError, normalizeAuthPayload } from "./authErrors";
+
+const loginEndpointByRole = {
+  student: "/auth/student-login",
+  teacher: "/auth/teacher-login",
+  admin: "/auth/admin-login",
+};
 
 export function getStoredAuth() {
   const raw = window.localStorage.getItem(getAuthStorageKey());
@@ -14,6 +21,23 @@ export function clearAuthStorage() {
 }
 
 export async function login(payload) {
-  const { data } = await api.post("/auth/login", payload);
-  return data;
+  const role = String(payload?.role || "").trim().toLowerCase();
+  const endpoint = loginEndpointByRole[role];
+  if (!endpoint) {
+    throw mapLoginError({ response: { status: 403, data: {} } });
+  }
+
+  const username = String(payload?.username || payload?.email || "").trim();
+  const password = String(payload?.password || "");
+  const requestPayload =
+    role === "student"
+      ? { mssv: username, password }
+      : { username, password };
+
+  try {
+    const { data } = await portalApi.post(endpoint, requestPayload);
+    return normalizeAuthPayload(data, role);
+  } catch (error) {
+    throw mapLoginError(error);
+  }
 }

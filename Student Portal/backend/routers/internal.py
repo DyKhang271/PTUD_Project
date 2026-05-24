@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from services import internal_service
+from services.academic_scheduling_service import build_academic_scheduling_source, get_academic_scheduling_options
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -85,6 +86,30 @@ def get_course_sections_source(
 @router.get("/source-terms", dependencies=[Depends(require_internal_api_key)])
 def get_source_terms():
     return internal_service.get_source_terms_internal()
+
+
+@router.get("/academic-scheduling-source", dependencies=[Depends(require_internal_api_key)])
+def get_academic_scheduling_source(
+    term_code: str = Query(..., min_length=1),
+    program_name: str | None = Query(default=None),
+    program_id: str | None = Query(default=None),
+    cohort: str | None = Query(default=None),
+    curriculum_semester: int = Query(..., ge=1),
+    strict_curriculum_match: bool = Query(default=False),
+):
+    return build_academic_scheduling_source(
+        term_code=term_code,
+        program_name=program_name,
+        program_id=program_id,
+        cohort=cohort,
+        curriculum_semester=curriculum_semester,
+        strict_curriculum_match=strict_curriculum_match,
+    )
+
+
+@router.get("/academic-scheduling-options", dependencies=[Depends(require_internal_api_key)])
+def academic_scheduling_options():
+    return get_academic_scheduling_options()
 
 
 @router.get("/students/{student_id}/course-sections", dependencies=[Depends(require_internal_api_key)])
