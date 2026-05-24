@@ -1,3 +1,5 @@
+import CustomSelect from "../../../components/CustomSelect";
+
 export default function PlanFilters({
   filters,
   faculties,
@@ -13,13 +15,41 @@ export default function PlanFilters({
   actionLoading,
   disabled,
 }) {
+  const facultyOptions = [
+    { value: "", label: "Chọn khoa" },
+    ...faculties.map((f) => ({ value: f.id, label: f.name }))
+  ];
+
+  const programOptions = [
+    { value: "", label: "Chọn chương trình" },
+    ...programs.map((p) => ({ value: p.id, label: p.name }))
+  ];
+
+  const cohortOptions = [
+    { value: "", label: "Chọn khóa tuyển" },
+    ...cohorts.map((c) => ({ value: c.id, label: c.code }))
+  ];
+
+  const semesterOptions = [
+    { value: "", label: "Chọn học kỳ CT khung" },
+    ...semesters.map((s) => ({ value: s, label: `Học kỳ ${s}` }))
+  ];
+
+  const termOptions = [
+    { value: "", label: "Chọn học kỳ thực tế" },
+    ...terms.map((t) => ({
+      value: t.term_code,
+      label: `${t.term_name} - ${t.term_code} - ${t.course_count || 0} môn - ${t.student_count || 0} SV`
+    }))
+  ];
+
   return (
     <div className="panel section-stack">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Ke hoach mo lop hoc phan</h2>
+          <h2 className="page-title">Kế hoạch mở lớp học phần</h2>
           <p className="page-subtitle">
-            Lap ke hoach mo lop theo khoa, chuong trinh, khoa hoc, hoc ky CT khung va hoc ky thuc te.
+            Lập kế hoạch mở lớp theo khoa, chương trình, khóa học, học kỳ CT khung và học kỳ thực tế.
           </p>
         </div>
       </div>
@@ -27,72 +57,62 @@ export default function PlanFilters({
       <div className="plan-filter-grid">
         <label className="field-group">
           <span>Khoa</span>
-          <select value={filters.faculty_id} onChange={(event) => onChange("faculty_id", event.target.value)}>
-            <option value="">Chon khoa</option>
-            {faculties.map((faculty) => (
-              <option key={faculty.id} value={faculty.id}>
-                {faculty.name}
-              </option>
-            ))}
-          </select>
+          <CustomSelect
+            value={filters.faculty_id}
+            onChange={(val) => onChange("faculty_id", val)}
+            options={facultyOptions}
+            placeholder="Chọn khoa"
+          />
         </label>
 
         <label className="field-group">
-          <span>Chuong trinh / Nganh</span>
-          <select value={filters.program_id} onChange={(event) => onChange("program_id", event.target.value)} disabled={!filters.faculty_id}>
-            <option value="">Chon chuong trinh</option>
-            {programs.map((program) => (
-              <option key={program.id} value={program.id}>
-                {program.name}
-              </option>
-            ))}
-          </select>
+          <span>Chương trình / Ngành</span>
+          <CustomSelect
+            value={filters.program_id}
+            onChange={(val) => onChange("program_id", val)}
+            options={programOptions}
+            disabled={!filters.faculty_id}
+            placeholder="Chọn chương trình"
+          />
         </label>
 
         <label className="field-group">
-          <span>Khoa</span>
-          <select value={filters.cohort_id} onChange={(event) => onChange("cohort_id", event.target.value)} disabled={!filters.program_id}>
-            <option value="">Chon khoa hoc</option>
-            {cohorts.map((cohort) => (
-              <option key={cohort.id} value={cohort.id}>
-                {cohort.code}
-              </option>
-            ))}
-          </select>
+          <span>Khóa tuyển</span>
+          <CustomSelect
+            value={filters.cohort_id}
+            onChange={(val) => onChange("cohort_id", val)}
+            options={cohortOptions}
+            disabled={!filters.program_id}
+            placeholder="Chọn khóa tuyển"
+          />
         </label>
 
         <label className="field-group">
-          <span>Hoc ky CT khung</span>
-          <select
+          <span>Học kỳ CT khung</span>
+          <CustomSelect
             value={filters.curriculum_semester}
-            onChange={(event) => onChange("curriculum_semester", event.target.value)}
+            onChange={(val) => onChange("curriculum_semester", val)}
+            options={semesterOptions}
             disabled={!filters.cohort_id}
-          >
-            <option value="">Chon hoc ky CT khung</option>
-            {semesters.map((semester) => (
-              <option key={semester} value={semester}>
-                Hoc ky {semester}
-              </option>
-            ))}
-          </select>
+            placeholder="Chọn học kỳ CT khung"
+          />
         </label>
 
         <label className="field-group">
-          <span>Hoc ky thuc te</span>
-          <select value={filters.term_code} onChange={(event) => onChange("term_code", event.target.value)}>
-            <option value="">Chon hoc ky thuc te</option>
-            {terms.map((term) => (
-              <option key={term.term_code} value={term.term_code}>
-                {term.term_name} - {term.term_code} - {term.course_count || 0} mon - {term.student_count || 0} SV
-              </option>
-            ))}
-          </select>
+          <span>Học kỳ thực tế</span>
+          <CustomSelect
+            value={filters.term_code}
+            onChange={(val) => onChange("term_code", val)}
+            options={termOptions}
+            placeholder="Chọn học kỳ thực tế"
+          />
         </label>
       </div>
 
+
       <div className="button-row">
         <button className="secondary-button" type="button" onClick={onImportCurriculum} disabled={actionLoading.importCurriculum}>
-          {actionLoading.importCurriculum ? "Dang dong bo CT khung..." : "Dong bo CT khung tu Student Portal"}
+          {actionLoading.importCurriculum ? "Đang đồng bộ CT khung..." : "Đồng bộ CT khung từ Student Portal"}
         </button>
         <button
           className="secondary-button"
@@ -100,13 +120,13 @@ export default function PlanFilters({
           onClick={onImportSections}
           disabled={!filters.term_code || actionLoading.importSections}
         >
-          {actionLoading.importSections ? "Dang dong bo lop HP..." : "Dong bo lop HP hoc ky nay"}
+          {actionLoading.importSections ? "Đang đồng bộ lớp HP..." : "Đồng bộ lớp HP học kỳ này"}
         </button>
         <button className="primary-button" type="button" onClick={onSuggestPlan} disabled={disabled || actionLoading.suggestPlan}>
-          {actionLoading.suggestPlan ? "Dang de xuat..." : "De xuat mo lop"}
+          {actionLoading.suggestPlan ? "Đang đề xuất..." : "Đề xuất mở lớp"}
         </button>
         <button className="primary-button" type="button" onClick={onBulkCreate} disabled={disabled || actionLoading.bulkCreate}>
-          {actionLoading.bulkCreate ? "Dang tao lop..." : "Tao lop HP cho cac mon con thieu"}
+          {actionLoading.bulkCreate ? "Đang tạo lớp..." : "Tạo lớp HP cho các môn còn thiếu"}
         </button>
       </div>
     </div>

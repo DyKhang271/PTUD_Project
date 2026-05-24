@@ -1,7 +1,8 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import StatusBadge from "../../components/StatusBadge";
+import CustomSelect from "../../components/CustomSelect";
 import {
   cleanupInvalidTimetableEntries,
   createExam,
@@ -19,37 +20,37 @@ import {
 } from "../../services/adminApi";
 
 const DAY_OPTIONS = [
-  { value: 2, label: "Thá»© 2" },
-  { value: 3, label: "Thá»© 3" },
-  { value: 4, label: "Thá»© 4" },
-  { value: 5, label: "Thá»© 5" },
-  { value: 6, label: "Thá»© 6" },
-  { value: 7, label: "Thá»© 7" },
-  { value: 1, label: "Chá»§ nháº­t" },
+  { value: 2, label: "Thứ 2" },
+  { value: 3, label: "Thứ 3" },
+  { value: 4, label: "Thứ 4" },
+  { value: 5, label: "Thứ 5" },
+  { value: 6, label: "Thứ 6" },
+  { value: 7, label: "Thứ 7" },
+  { value: 1, label: "Chủ nhật" },
 ];
 
 const SCHEDULED_TOGGLES = [
-  { value: "all", label: "Táº¥t cáº£" },
-  { value: "scheduled", label: "ÄÃ£ xáº¿p lá»‹ch" },
-  { value: "unscheduled", label: "ChÆ°a xáº¿p lá»‹ch" },
-  { value: "unclassified", label: "ChÆ°a phÃ¢n loáº¡i" },
+  { value: "all", label: "Tất cả" },
+  { value: "scheduled", label: "Đã xếp lịch" },
+  { value: "unscheduled", label: "Chưa xếp lịch" },
+  { value: "unclassified", label: "Chưa phân loại" },
 ];
 
 const TAB_OPTIONS = [
-  { value: "timetable", label: "Lá»‹ch há»c" },
-  { value: "exam", label: "Lá»‹ch thi" },
+  { value: "timetable", label: "Lịch học" },
+  { value: "exam", label: "Lịch thi" },
 ];
 
 const EXAM_TYPE_OPTIONS = [
-  { value: "", label: "Chá»n hÃ¬nh thá»©c thi" },
-  { value: "Giá»¯a ká»³", label: "Giá»¯a ká»³" },
-  { value: "Cuá»‘i ká»³", label: "Cuá»‘i ká»³" },
+  { value: "", label: "Chọn hình thức thi" },
+  { value: "Giữa kỳ", label: "Giữa kỳ" },
+  { value: "Cuối kỳ", label: "Cuối kỳ" },
 ];
 
 const SESSION_TYPE_OPTIONS = [
-  { value: "theory", label: "LÃ½ thuyáº¿t" },
-  { value: "practical", label: "Thá»±c hÃ nh" },
-  { value: "online", label: "Trá»±c tuyáº¿n" },
+  { value: "theory", label: "Lý thuyết" },
+  { value: "practical", label: "Thực hành" },
+  { value: "online", label: "Trực tuyến" },
 ];
 
 const initialFilters = {
@@ -103,7 +104,7 @@ function uniqueSorted(values) {
 }
 
 function formatDay(dayOfWeek) {
-  return DAY_OPTIONS.find((option) => option.value === dayOfWeek)?.label || `Thá»© ${dayOfWeek}`;
+  return DAY_OPTIONS.find((option) => option.value === dayOfWeek)?.label || `Thứ ${dayOfWeek}`;
 }
 
 function formatTimeRange(startTime, endTime) {
@@ -197,7 +198,7 @@ export default function TimetableManagement() {
       setState((prev) => ({
         ...prev,
         loading: false,
-        error: err?.response?.data?.detail || "KhÃ´ng táº£i Ä‘Æ°á»£c module lá»‹ch há»c.",
+        error: err?.response?.data?.detail || "Không tải được module lịch học.",
       }));
     }
   }
@@ -266,26 +267,26 @@ export default function TimetableManagement() {
 
   async function runInvalidCleanup() {
     if (!filters.term_id) {
-      setFeedback("Vui lÃ²ng chá»n há»c ká»³ trÆ°á»›c khi dá»n dá»¯ liá»‡u lá»‹ch lá»—i.");
+      setFeedback("Vui lòng chọn học kỳ trước khi dọn dữ liệu lịch lỗi.");
       return;
     }
     try {
       const result = await cleanupInvalidTimetableEntries({ term_id: filters.term_id });
       const message = result.marked_invalid_count
-        ? `ÄÃ£ Ä‘Ã¡nh dáº¥u ${result.marked_invalid_count}/${result.detected_count} lá»‹ch lá»—i lÃ  cancelled.`
+        ? `Đã đánh dấu ${result.marked_invalid_count}/${result.detected_count} lịch lỗi là cancelled.`
         : result.detected_count
-          ? `ÄÃ£ phÃ¡t hiá»‡n ${result.detected_count} lá»‹ch lá»—i nhÆ°ng khÃ´ng cÃ³ báº£n ghi má»›i cáº§n Ä‘Ã¡nh dáº¥u thÃªm.`
-          : "KhÃ´ng phÃ¡t hiá»‡n lá»‹ch lá»—i trong há»c ká»³ Ä‘ang chá»n.";
+          ? `Đã phát hiện ${result.detected_count} lịch lỗi nhưng không có bản ghi mới cần đánh dấu thêm.`
+          : "Không phát hiện lịch lỗi trong học kỳ đang chọn.";
       setFeedback(message);
       await refreshCurrentView();
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "KhÃ´ng thá»ƒ dá»n dá»¯ liá»‡u lá»‹ch lá»—i.");
+      setFeedback(err?.response?.data?.detail || "Không thể dọn dữ liệu lịch lỗi.");
     }
   }
 
   function openTimetableModal(entry = null) {
     if (!contextReady || isUnclassifiedMode) {
-      setFeedback("Vui lÃ²ng chá»n Ä‘á»§ Há»c ká»³, Khoa vÃ  NgÃ nh / ChÆ°Æ¡ng trÃ¬nh trÆ°á»›c khi táº¡o lá»‹ch há»c.");
+      setFeedback("Vui lòng chọn đủ Học kỳ, Khoa và Ngành / Chương trình trước khi tạo lịch học.");
       return;
     }
     const activeTerm = termsById.get(entry?.term_id || filters.term_id);
@@ -326,7 +327,7 @@ export default function TimetableManagement() {
 
   function openExamModal(exam = null) {
     if (!contextReady || isUnclassifiedMode) {
-      setFeedback("Vui lÃ²ng chá»n Ä‘á»§ Há»c ká»³, Khoa vÃ  NgÃ nh / ChÆ°Æ¡ng trÃ¬nh trÆ°á»›c khi táº¡o lá»‹ch thi.");
+      setFeedback("Vui lòng chọn đủ Học kỳ, Khoa và Ngành / Chương trình trước khi tạo lịch thi.");
       return;
     }
     setFeedback("");
@@ -364,7 +365,7 @@ export default function TimetableManagement() {
   async function saveTimetable(event) {
     event.preventDefault();
     if (!timetableForm.term_id || !timetableForm.faculty || !timetableForm.program || !timetableForm.section_id) {
-      setFeedback("KhÃ´ng thá»ƒ lÆ°u lá»‹ch há»c náº¿u thiáº¿u context hoáº·c chÆ°a chá»n lá»›p há»c pháº§n.");
+      setFeedback("Không thể lưu lịch học nếu thiếu context hoặc chưa chọn lớp học phần.");
       return;
     }
     const payload = {
@@ -382,23 +383,23 @@ export default function TimetableManagement() {
     try {
       if (timetableForm.id) {
         await updateTimetableEntry(timetableForm.id, payload);
-        setFeedback("ÄÃ£ cáº­p nháº­t lá»‹ch há»c.");
+        setFeedback("Đã cập nhật lịch học.");
       } else {
         await createTimetableEntry(payload);
-        setFeedback("ÄÃ£ táº¡o lá»‹ch há»c.");
+        setFeedback("Đã tạo lịch học.");
       }
       setModalType(null);
       setTimetableForm(initialTimetableForm);
       await refreshCurrentView();
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "KhÃ´ng thá»ƒ lÆ°u lá»‹ch há»c.");
+      setFeedback(err?.response?.data?.detail || "Không thể lưu lịch học.");
     }
   }
 
   async function saveExam(event) {
     event.preventDefault();
     if (!examForm.term_id || !examForm.faculty || !examForm.program || !examForm.section_id) {
-      setFeedback("KhÃ´ng thá»ƒ lÆ°u lá»‹ch thi náº¿u thiáº¿u context hoáº·c chÆ°a chá»n lá»›p há»c pháº§n.");
+      setFeedback("Không thể lưu lịch thi nếu thiếu context hoặc chưa chọn lớp học phần.");
       return;
     }
     const payload = {
@@ -414,16 +415,16 @@ export default function TimetableManagement() {
     try {
       if (examForm.id) {
         await updateExam(examForm.id, payload);
-        setFeedback("ÄÃ£ cáº­p nháº­t lá»‹ch thi.");
+        setFeedback("Đã cập nhật lịch thi.");
       } else {
         await createExam(payload);
-        setFeedback("ÄÃ£ táº¡o lá»‹ch thi.");
+        setFeedback("Đã tạo lịch thi.");
       }
       setModalType(null);
       setExamForm(initialExamForm);
       await refreshCurrentView();
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "KhÃ´ng thá»ƒ lÆ°u lá»‹ch thi.");
+      setFeedback(err?.response?.data?.detail || "Không thể lưu lịch thi.");
     }
   }
 
@@ -432,7 +433,7 @@ export default function TimetableManagement() {
       await deleteTimetableEntry(entryId);
       await refreshCurrentView();
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "KhÃ´ng thá»ƒ xÃ³a lá»‹ch há»c.");
+      setFeedback(err?.response?.data?.detail || "Không thể xóa lịch học.");
     }
   }
 
@@ -441,7 +442,7 @@ export default function TimetableManagement() {
       await deleteExam(examId);
       await refreshCurrentView();
     } catch (err) {
-      setFeedback(err?.response?.data?.detail || "KhÃ´ng thá»ƒ xÃ³a lá»‹ch thi.");
+      setFeedback(err?.response?.data?.detail || "Không thể xóa lịch thi.");
     }
   }
 
@@ -455,16 +456,43 @@ export default function TimetableManagement() {
   const activeTimetableTerm = termsById.get(timetableForm.term_id);
   const activeExamTerm = termsById.get(examForm.term_id);
 
-  if (state.loading && !state.terms.length) return <LoadingState label="Äang táº£i module lá»‹ch há»c..." />;
+  const termSelectOptions = useMemo(() => [
+    { value: "", label: "Chọn học kỳ" },
+    ...state.terms.map((t) => ({ value: t.id, label: t.term_code }))
+  ], [state.terms]);
+
+  const facultySelectOptions = useMemo(() => [
+    { value: "", label: "Chọn khoa" },
+    ...facultyOptions.map((f) => ({ value: f, label: f }))
+  ], [facultyOptions]);
+
+  const programSelectOptions = useMemo(() => [
+    { value: "", label: "Chọn ngành / chương trình" },
+    ...programOptions.map((p) => ({ value: p, label: p }))
+  ], [programOptions]);
+
+  const semesterSelectOptions = [
+    { value: "", label: "Tất cả" }
+  ];
+
+  const courseSelectOptions = useMemo(() => [
+    { value: "", label: "Tất cả môn học" },
+    ...courseOptions.map((subject) => ({
+      value: subject.course_id,
+      label: `${subject.course_name} (${subject.course_code})`
+    }))
+  ], [courseOptions]);
+
+  if (state.loading && !state.terms.length) return <LoadingState label="Đang tải module lịch học..." />;
   if (state.error && !state.terms.length) return <ErrorState message={state.error} onRetry={() => loadView(filters)} />;
 
   return (
     <div className="page-shell">
       <div className="page-header">
         <div>
-          <h2 className="page-title">Quáº£n lÃ½ lá»‹ch há»c</h2>
+          <h2 className="page-title">Quản lý lịch học</h2>
           <p className="page-subtitle">
-            Chá»n ngá»¯ cáº£nh há»c vá»¥ trÆ°á»›c khi thao tÃ¡c dá»¯ liá»‡u Ä‘á»ƒ admin chá»‰ nhÃ¬n tháº¥y Ä‘Ãºng lá»‹ch há»c, lá»‹ch thi thuá»™c há»c ká»³, khoa vÃ  ngÃ nh Ä‘ang quáº£n lÃ½.
+            Chọn ngữ cảnh học vụ trước khi thao tác dữ liệu để admin chỉ nhìn thấy đúng lịch học, lịch thi thuộc học kỳ, khoa và ngành đang quản lý.
           </p>
         </div>
       </div>
@@ -472,12 +500,12 @@ export default function TimetableManagement() {
       <div className="toolbar-card sticky">
         <div className="filter-grid">
           <label className="field-group">
-            <span>Há»c ká»³</span>
-            <select
+            <span>Học kỳ</span>
+            <CustomSelect
               value={filters.term_id}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  term_id: event.target.value,
+                  term_id: val,
                   faculty: "",
                   program: "",
                   curriculum_semester: "",
@@ -485,93 +513,73 @@ export default function TimetableManagement() {
                   q: "",
                 })
               }
-            >
-              <option value="">Chá»n há»c ká»³</option>
-              {state.terms.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.term_code}
-                </option>
-              ))}
-            </select>
+              options={termSelectOptions}
+              placeholder="Chọn học kỳ"
+            />
           </label>
 
           <label className="field-group">
             <span>Khoa</span>
-            <select
+            <CustomSelect
               value={filters.faculty}
               disabled={!filters.term_id || isUnclassifiedMode}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  faculty: event.target.value,
+                  faculty: val,
                   program: "",
                   curriculum_semester: "",
                   course_id: "",
                 })
               }
-            >
-              <option value="">Chá»n khoa</option>
-              {facultyOptions.map((faculty) => (
-                <option key={faculty} value={faculty}>
-                  {faculty}
-                </option>
-              ))}
-            </select>
+              options={facultySelectOptions}
+              placeholder="Chọn khoa"
+            />
           </label>
 
           <label className="field-group">
-            <span>NgÃ nh / ChÆ°Æ¡ng trÃ¬nh</span>
-            <select
+            <span>Ngành / Chương trình</span>
+            <CustomSelect
               value={filters.program}
               disabled={!filters.faculty || isUnclassifiedMode}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  program: event.target.value,
+                  program: val,
                   curriculum_semester: "",
                   course_id: "",
                 })
               }
-            >
-              <option value="">Chá»n ngÃ nh / chÆ°Æ¡ng trÃ¬nh</option>
-              {programOptions.map((program) => (
-                <option key={program} value={program}>
-                  {program}
-                </option>
-              ))}
-            </select>
+              options={programSelectOptions}
+              placeholder="Chọn ngành / chương trình"
+            />
           </label>
 
           <label className="field-group">
-            <span>Há»c ká»³ CT</span>
-            <select
+            <span>Học kỳ CT</span>
+            <CustomSelect
               value={filters.curriculum_semester}
               disabled={!contextReady || isUnclassifiedMode}
-              onChange={(event) => updateFilters({ curriculum_semester: event.target.value })}
-            >
-              <option value="">Táº¥t cáº£</option>
-            </select>
+              onChange={(val) => updateFilters({ curriculum_semester: val })}
+              options={semesterSelectOptions}
+              placeholder="Tất cả"
+            />
           </label>
 
           <label className="field-group">
-            <span>MÃ´n há»c</span>
-            <select
+            <span>Môn học</span>
+            <CustomSelect
               value={filters.course_id}
               disabled={!contextReady || isUnclassifiedMode}
-              onChange={(event) => updateFilters({ course_id: event.target.value })}
-            >
-              <option value="">Táº¥t cáº£ mÃ´n há»c</option>
-              {courseOptions.map((subject) => (
-                <option key={`${subject.term_id || "termless"}-${subject.course_id}`} value={subject.course_id}>
-                  {subject.course_name} ({subject.course_code})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => updateFilters({ course_id: val })}
+              options={courseSelectOptions}
+              placeholder="Tất cả môn học"
+            />
           </label>
 
           <label className="field-group">
-            <span>TÃ¬m kiáº¿m</span>
+            <span>Tìm kiếm</span>
             <input
               type="search"
-              placeholder="TÃªn mÃ´n, mÃ£ lá»›p, phÃ²ng, giáº£ng viÃªn..."
+              placeholder="Tên môn, mã lớp, phòng, giảng viên..."
               value={filters.q}
               onChange={(event) => updateFilters({ q: event.target.value })}
             />
@@ -579,7 +587,7 @@ export default function TimetableManagement() {
         </div>
 
         <div className="admin-toolbar-actions">
-          <div className="admin-toggle-group" role="tablist" aria-label="Lá»c tráº¡ng thÃ¡i xáº¿p lá»‹ch">
+          <div className="admin-toggle-group" role="tablist" aria-label="Lọc trạng thái xếp lịch">
             {SCHEDULED_TOGGLES.map((toggle) => (
               <button
                 key={toggle.value}
@@ -602,44 +610,44 @@ export default function TimetableManagement() {
 
           <div className="button-row">
             <button className="secondary-button" type="button" onClick={refreshCurrentView}>
-              Táº£i láº¡i
+              Tải lại
             </button>
             <button className="secondary-button" type="button" onClick={runInvalidCleanup} disabled={!filters.term_id}>
-              Dá»n lá»‹ch lá»—i
+              Dọn lịch lỗi
             </button>
             <button className="primary-button" type="button" onClick={() => openTimetableModal()} disabled={!contextReady || isUnclassifiedMode}>
-              Táº¡o lá»‹ch há»c
+              Tạo lịch học
             </button>
             <button className="primary-button" type="button" onClick={() => openExamModal()} disabled={!contextReady || isUnclassifiedMode}>
-              Táº¡o lá»‹ch thi
+              Tạo lịch thi
             </button>
           </div>
         </div>
       </div>
 
-      {feedback ? <div className="badge info" style={{ display: "block", width: "100%", padding: "12px", borderRadius: "var(--radius-md)" }}>â„¹ï¸ {feedback}</div> : null}
+      {feedback ? <div className="badge info" style={{ display: "block", width: "100%", padding: "12px", borderRadius: "var(--radius-md)" }}>ℹ️ {feedback}</div> : null}
       {selectedFilterTerm && (!selectedFilterTerm.start_date || !selectedFilterTerm.end_date) ? (
         <div className="badge warning" style={{ display: "block", width: "100%", padding: "16px", borderRadius: "var(--radius-md)", textAlign: "left" }}>
-          <strong>âš ï¸ Há»c ká»³ chÆ°a cÃ³ pháº¡m vi ngÃ y</strong>
-          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: "4px" }}>Validation theo thá»i gian há»c ká»³ sáº½ chÆ°a Ã¡p dá»¥ng Ä‘áº§y Ä‘á»§ cho tá»›i khi há»c ká»³ nÃ y Ä‘Æ°á»£c backfill ngÃ y báº¯t Ä‘áº§u/káº¿t thÃºc.</div>
+          <strong>⚠️ Học kỳ chưa có phạm vi ngày</strong>
+          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: "4px" }}>Validation theo thời gian học kỳ sẽ chưa áp dụng đầy đủ cho tới khi học kỳ này được backfill ngày bắt đầu/kết thúc.</div>
         </div>
       ) : null}
       {state.invalidEntries.length ? (
         <div className="badge warning" style={{ display: "block", width: "100%", padding: "16px", borderRadius: "var(--radius-md)", textAlign: "left" }}>
-          <strong>âš ï¸ PhÃ¡t hiá»‡n {state.invalidEntries.length} lá»‹ch lá»—i trong há»c ká»³ Ä‘Ã£ chá»n</strong>
-          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: "4px" }}>DÃ¹ng nÃºt â€œDá»n lá»‹ch lá»—iâ€ Ä‘á»ƒ tá»± Ä‘á»™ng Ä‘Ã¡nh dáº¥u cÃ¡c báº£n ghi sai lÃ  cancelled.</div>
+          <strong>⚠️ Phát hiện {state.invalidEntries.length} lịch lỗi trong học kỳ đã chọn</strong>
+          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: "4px" }}>Dùng nút “Dọn lịch lỗi” để tự động đánh dấu các bản ghi sai là cancelled.</div>
         </div>
       ) : null}
-      {state.loading ? <LoadingState label="Äang cáº­p nháº­t dá»¯ liá»‡u lá»‹ch há»c..." /> : null}
+      {state.loading ? <LoadingState label="Đang cập nhật dữ liệu lịch học..." /> : null}
       {state.error ? <ErrorState message={state.error} onRetry={refreshCurrentView} /> : null}
 
-      {needsContextSelection ? <EmptyState message="Vui lÃ²ng chá»n Há»c ká»³, Khoa vÃ  NgÃ nh/ChÆ°Æ¡ng trÃ¬nh Ä‘á»ƒ xem lá»‹ch há»c." /> : null}
-      {unclassifiedNeedsTerm ? <EmptyState message="Vui lÃ²ng chá»n Há»c ká»³ Ä‘á»ƒ xem dá»¯ liá»‡u chÆ°a phÃ¢n loáº¡i." /> : null}
+      {needsContextSelection ? <EmptyState message="Vui lòng chọn Học kỳ, Khoa và Ngành/Chương trình để xem lịch học." /> : null}
+      {unclassifiedNeedsTerm ? <EmptyState message="Vui lòng chọn Học kỳ để xem dữ liệu chưa phân loại." /> : null}
 
       {isUnclassifiedMode && filters.term_id ? (
         <div className="badge warning" style={{ display: "block", width: "100%", padding: "16px", borderRadius: "var(--radius-md)", textAlign: "left", marginBottom: "16px" }}>
-          <strong>âš ï¸ Dá»¯ liá»‡u chÆ°a phÃ¢n loáº¡i</strong>
-          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: "4px" }}>CÃ¡c lá»›p há»c pháº§n nÃ y chÆ°a Ä‘Æ°á»£c map Ä‘á»§ metadata há»c vá»¥.</div>
+          <strong>⚠️ Dữ liệu chưa phân loại</strong>
+          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginTop: "4px" }}>Các lớp học phần này chưa được map đủ metadata học vụ.</div>
         </div>
       ) : null}
 
@@ -647,14 +655,14 @@ export default function TimetableManagement() {
         <div className="data-card section-stack">
           <div className="admin-group-heading">
             <div>
-              <h3 className="page-title">{isUnclassifiedMode ? "Dá»¯ liá»‡u lá»‹ch chÆ°a phÃ¢n loáº¡i" : "Danh sÃ¡ch lá»‹ch theo mÃ´n"}</h3>
+              <h3 className="page-title">{isUnclassifiedMode ? "Dữ liệu lịch chưa phân loại" : "Danh sách lịch theo môn"}</h3>
               <p className="page-subtitle">
                 {isUnclassifiedMode
-                  ? "Chá»‰ hiá»ƒn thá»‹ cÃ¡c lá»›p há»c pháº§n cÃ²n thiáº¿u metadata khoa/ngÃ nh."
-                  : "Lá»‹ch há»c vÃ  lá»‹ch thi Ä‘Æ°á»£c tÃ¡ch rÃµ theo tab nhÆ°ng váº«n dÃ¹ng cÃ¹ng ngá»¯ cáº£nh há»c vá»¥."}
+                  ? "Chỉ hiển thị các lớp học phần còn thiếu metadata khoa/ngành."
+                  : "Lịch học và lịch thi được tách rõ theo tab nhưng vẫn dùng cùng ngữ cảnh học vụ."}
               </p>
             </div>
-            <div className="admin-tab-group" role="tablist" aria-label="Tab lá»‹ch há»c vÃ  lá»‹ch thi">
+            <div className="admin-tab-group" role="tablist" aria-label="Tab lịch học và lịch thi">
               {TAB_OPTIONS.map((tab) => (
                 <button
                   key={tab.value}
@@ -675,15 +683,15 @@ export default function TimetableManagement() {
                   <article key={`${course.term_id || "termless"}-${course.course_code}-study`} className="admin-course-card">
                     <div className="admin-course-card-head">
                       <div className="section-stack">
-                        <div className="eyebrow">MÃ´n há»c</div>
+                        <div className="eyebrow">Môn học</div>
                         <div>
                           <h4>{course.course_name}</h4>
                           <p>{course.course_code}</p>
                         </div>
                       </div>
                       <div className="admin-course-card-metrics">
-                        <span>{course.section_count} lá»›p há»c pháº§n</span>
-                        <strong>{course.scheduled_count} lá»‹ch Ä‘Ã£ xáº¿p</strong>
+                        <span>{course.section_count} lớp học phần</span>
+                        <strong>{course.scheduled_count} lịch đã xếp</strong>
                       </div>
                     </div>
 
@@ -693,34 +701,34 @@ export default function TimetableManagement() {
                           <div key={item.id} className="admin-schedule-row">
                             <div className="admin-schedule-primary">
                               <strong>{item.section_code}</strong>
-                              <span>{formatDay(item.day_of_week)} â€¢ {formatTimeRange(item.start_time, item.end_time)}</span>
-                              <span>Loáº¡i buá»•i: {SESSION_TYPE_OPTIONS.find((option) => option.value === item.session_type)?.label || item.session_type || "--"}</span>
+                              <span>{formatDay(item.day_of_week)} • {formatTimeRange(item.start_time, item.end_time)}</span>
+                              <span>Loại buổi: {SESSION_TYPE_OPTIONS.find((option) => option.value === item.session_type)?.label || item.session_type || "--"}</span>
                             </div>
                             <div className="admin-schedule-secondary">
-                              <span>PhÃ²ng: {item.room || "--"}</span>
-                              <span>CÆ¡ sá»Ÿ: {item.location || "--"}</span>
-                              <span>Giáº£ng viÃªn: {item.teacher_name || item.teacher_external_id || "--"}</span>
+                              <span>Phòng: {item.room || "--"}</span>
+                              <span>Cơ sở: {item.location || "--"}</span>
+                              <span>Giảng viên: {item.teacher_name || item.teacher_external_id || "--"}</span>
                             </div>
                             <div className="admin-schedule-actions">
                               <StatusBadge status={item.status} />
                               <button className="secondary-button" type="button" onClick={() => openTimetableModal(item)} disabled={isUnclassifiedMode}>
-                                Sá»­a
+                                Sửa
                               </button>
                               <button className="danger-button" type="button" onClick={() => removeTimetable(item.id)}>
-                                XÃ³a
+                                Xóa
                               </button>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="admin-course-empty">ChÆ°a cÃ³ lá»‹ch cho mÃ´n nÃ y.</div>
+                      <div className="admin-course-empty">Chưa có lịch cho môn này.</div>
                     )}
                   </article>
                 ))}
               </div>
             ) : (
-              <EmptyState message={isUnclassifiedMode ? "KhÃ´ng cÃ³ dá»¯ liá»‡u chÆ°a phÃ¢n loáº¡i trong bá»™ lá»c hiá»‡n táº¡i." : "ChÆ°a cÃ³ mÃ´n há»c thuá»™c ngá»¯ cáº£nh Ä‘ang chá»n."} />
+              <EmptyState message={isUnclassifiedMode ? "Không có dữ liệu chưa phân loại trong bộ lọc hiện tại." : "Chưa có môn học thuộc ngữ cảnh đang chọn."} />
             )
           ) : state.examGroups.length ? (
             <div className="admin-course-card-grid">
@@ -728,15 +736,15 @@ export default function TimetableManagement() {
                 <article key={`${course.term_id || "termless"}-${course.course_code}-exam`} className="admin-course-card">
                   <div className="admin-course-card-head">
                     <div className="section-stack">
-                      <div className="eyebrow">MÃ´n há»c</div>
+                      <div className="eyebrow">Môn học</div>
                       <div>
                         <h4>{course.course_name}</h4>
                         <p>{course.course_code}</p>
                       </div>
                     </div>
                     <div className="admin-course-card-metrics">
-                      <span>{course.section_count} lá»›p há»c pháº§n</span>
-                      <strong>{course.exams.length} lá»‹ch thi</strong>
+                      <span>{course.section_count} lớp học phần</span>
+                      <strong>{course.exams.length} lịch thi</strong>
                     </div>
                   </div>
 
@@ -746,33 +754,33 @@ export default function TimetableManagement() {
                         <div key={item.id} className="admin-schedule-row">
                           <div className="admin-schedule-primary">
                             <strong>{item.section_code}</strong>
-                            <span>{item.exam_date} â€¢ {formatTimeRange(item.start_time, item.end_time)}</span>
+                            <span>{item.exam_date} • {formatTimeRange(item.start_time, item.end_time)}</span>
                           </div>
                           <div className="admin-schedule-secondary">
-                            <span>PhÃ²ng thi: {item.room || "--"}</span>
-                            <span>CÆ¡ sá»Ÿ: {item.location || "--"}</span>
-                            <span>HÃ¬nh thá»©c thi: {item.exam_type || "--"}</span>
+                            <span>Phòng thi: {item.room || "--"}</span>
+                            <span>Cơ sở: {item.location || "--"}</span>
+                            <span>Hình thức thi: {item.exam_type || "--"}</span>
                           </div>
                           <div className="admin-schedule-actions">
                             <StatusBadge status={item.status || "scheduled"} />
                             <button className="secondary-button" type="button" onClick={() => openExamModal(item)} disabled={isUnclassifiedMode}>
-                              Sá»­a
+                              Sửa
                             </button>
                             <button className="danger-button" type="button" onClick={() => removeExam(item.id)}>
-                              XÃ³a
+                              Xóa
                             </button>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="admin-course-empty">ChÆ°a cÃ³ lá»‹ch thi cho mÃ´n/lá»›p há»c pháº§n nÃ y.</div>
+                    <div className="admin-course-empty">Chưa có lịch thi cho môn/lớp học phần này.</div>
                   )}
                 </article>
               ))}
             </div>
           ) : (
-            <EmptyState message="ChÆ°a cÃ³ lá»‹ch thi cho mÃ´n/lá»›p há»c pháº§n nÃ y." />
+            <EmptyState message="Chưa có lịch thi cho môn/lớp học phần này." />
           )}
         </div>
       ) : null}
@@ -783,108 +791,107 @@ export default function TimetableManagement() {
             <form className="form-grid" onSubmit={saveTimetable}>
               <div className="admin-modal-head">
                 <div>
-                  <h3>{timetableForm.id ? "Cáº­p nháº­t lá»‹ch há»c" : "Táº¡o lá»‹ch há»c"}</h3>
+                  <h3>{timetableForm.id ? "Cập nhật lịch học" : "Tạo lịch học"}</h3>
                   <p className="page-subtitle">
-                    Context hiá»‡n táº¡i: {state.terms.find((term) => term.id === timetableForm.term_id)?.term_code || "--"} â€¢ {timetableForm.faculty || "--"} â€¢ {timetableForm.program || "--"}
+                    Context hiện tại: {state.terms.find((term) => term.id === timetableForm.term_id)?.term_code || "--"} • {timetableForm.faculty || "--"} • {timetableForm.program || "--"}
                   </p>
                   {activeTimetableTerm?.start_date && activeTimetableTerm?.end_date ? (
                     <p className="helper-text">
-                      Pháº¡m vi há»c ká»³: {activeTimetableTerm.start_date} Ä‘áº¿n {activeTimetableTerm.end_date}
+                      Phạm vi học kỳ: {activeTimetableTerm.start_date} đến {activeTimetableTerm.end_date}
                     </p>
                   ) : null}
                 </div>
                 <button className="secondary-button" type="button" onClick={() => setModalType(null)}>
-                  ÄÃ³ng
+                  Đóng
                 </button>
               </div>
 
               <div className="inline-form">
                 <label className="field-group">
-                  <span>MÃ´n há»c</span>
-                  <select value={timetableForm.course_id} onChange={(event) => setTimetableForm((prev) => ({ ...prev, course_id: event.target.value, section_id: "" }))} required>
-                    <option value="">Chá»n mÃ´n há»c</option>
-                    {courseOptions.map((subject) => (
-                      <option key={`${subject.term_id || "termless"}-${subject.course_id}`} value={subject.course_id}>
-                        {subject.course_name} ({subject.course_code})
-                      </option>
-                    ))}
-                  </select>
+                  <span>Môn học</span>
+                  <CustomSelect
+                    value={timetableForm.course_id}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, course_id: val, section_id: "" }))}
+                    options={[{ value: "", label: "Chọn môn học" }, ...courseOptions.map((s) => ({ value: s.course_id, label: `${s.course_name} (${s.course_code})` }))]}
+                    placeholder="Chọn môn học"
+                  />
                 </label>
                 <label className="field-group">
-                  <span>Lá»›p há»c pháº§n</span>
-                  <select value={timetableForm.section_id} onChange={(event) => setTimetableForm((prev) => ({ ...prev, section_id: event.target.value }))} required>
-                    <option value="">Chá»n lá»›p há»c pháº§n</option>
-                    {formSections.map((section) => (
-                      <option key={section.id} value={section.id}>
-                        {section.section_code} - {section.course_name}
-                      </option>
-                    ))}
-                  </select>
+                  <span>Lớp học phần</span>
+                  <CustomSelect
+                    value={timetableForm.section_id}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, section_id: val }))}
+                    options={[{ value: "", label: "Chọn lớp học phần" }, ...formSections.map((sec) => ({ value: sec.id, label: `${sec.section_code} - ${sec.course_name}` }))]}
+                    placeholder="Chọn lớp học phần"
+                  />
                 </label>
                 <label className="field-group">
-                  <span>Thá»©</span>
-                  <select value={timetableForm.day_of_week} onChange={(event) => setTimetableForm((prev) => ({ ...prev, day_of_week: event.target.value }))}>
-                    {DAY_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <span>Thứ</span>
+                  <CustomSelect
+                    value={timetableForm.day_of_week}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, day_of_week: val }))}
+                    options={DAY_OPTIONS}
+                    placeholder="Chọn thứ"
+                  />
                 </label>
                 <label className="field-group">
-                  <span>Tráº¡ng thÃ¡i</span>
-                  <select value={timetableForm.status} onChange={(event) => setTimetableForm((prev) => ({ ...prev, status: event.target.value }))}>
-                    <option value="published">Published</option>
-                    <option value="draft">Draft</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <span>Trạng thái</span>
+                  <CustomSelect
+                    value={timetableForm.status}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, status: val }))}
+                    options={[
+                      { value: "published", label: "Đã công bố" },
+                      { value: "draft", label: "Bản nháp" },
+                      { value: "cancelled", label: "Đã hủy" },
+                    ]}
+                    placeholder="Chọn trạng thái"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Loại buổi học</span>
-                  <select value={timetableForm.session_type} onChange={(event) => setTimetableForm((prev) => ({ ...prev, session_type: event.target.value }))}>
-                    {SESSION_TYPE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <CustomSelect
+                    value={timetableForm.session_type}
+                    onChange={(val) => setTimetableForm((prev) => ({ ...prev, session_type: val }))}
+                    options={SESSION_TYPE_OPTIONS}
+                    placeholder="Chọn loại buổi học"
+                  />
                 </label>
               </div>
 
               <div className="inline-form">
                 <label className="field-group">
-                  <span>Giá» báº¯t Ä‘áº§u</span>
+                  <span>Giờ bắt đầu</span>
                   <input type="time" value={timetableForm.start_time} onChange={(event) => setTimetableForm((prev) => ({ ...prev, start_time: event.target.value }))} />
                 </label>
                 <label className="field-group">
-                  <span>Giá» káº¿t thÃºc</span>
+                  <span>Giờ kết thúc</span>
                   <input type="time" value={timetableForm.end_time} onChange={(event) => setTimetableForm((prev) => ({ ...prev, end_time: event.target.value }))} />
                 </label>
                 <label className="field-group">
-                  <span>PhÃ²ng</span>
+                  <span>Phòng</span>
                   <input value={timetableForm.room} onChange={(event) => setTimetableForm((prev) => ({ ...prev, room: event.target.value }))} />
                 </label>
                 <label className="field-group">
-                  <span>CÆ¡ sá»Ÿ</span>
+                  <span>Cơ sở</span>
                   <input value={timetableForm.location} onChange={(event) => setTimetableForm((prev) => ({ ...prev, location: event.target.value }))} />
                 </label>
               </div>
 
               <div className="inline-form">
                 <label className="field-group">
-                  <span>Hiá»‡u lá»±c tá»«</span>
+                  <span>Hiệu lực từ</span>
                   <input type="date" value={timetableForm.valid_from} onChange={(event) => setTimetableForm((prev) => ({ ...prev, valid_from: event.target.value }))} />
                 </label>
                 <label className="field-group">
-                  <span>Hiá»‡u lá»±c Ä‘áº¿n</span>
+                  <span>Hiệu lực đến</span>
                   <input type="date" value={timetableForm.valid_to} onChange={(event) => setTimetableForm((prev) => ({ ...prev, valid_to: event.target.value }))} />
                 </label>
               </div>
 
               <div className="button-row">
-                <button className="primary-button" type="submit">{timetableForm.id ? "LÆ°u lá»‹ch há»c" : "Táº¡o lá»‹ch há»c"}</button>
+                <button className="primary-button" type="submit">{timetableForm.id ? "Lưu lịch học" : "Tạo lịch học"}</button>
                 <button className="secondary-button" type="button" onClick={() => setModalType(null)}>
-                  Há»§y
+                  Hủy
                 </button>
               </div>
             </form>
@@ -898,94 +905,94 @@ export default function TimetableManagement() {
             <form className="form-grid" onSubmit={saveExam}>
               <div className="admin-modal-head">
                 <div>
-                  <h3>{examForm.id ? "Cáº­p nháº­t lá»‹ch thi" : "Táº¡o lá»‹ch thi"}</h3>
+                  <h3>{examForm.id ? "Cập nhật lịch thi" : "Tạo lịch thi"}</h3>
                   <p className="page-subtitle">
-                    Context hiá»‡n táº¡i: {state.terms.find((term) => term.id === examForm.term_id)?.term_code || "--"} â€¢ {examForm.faculty || "--"} â€¢ {examForm.program || "--"}
+                    Context hiện tại: {state.terms.find((term) => term.id === examForm.term_id)?.term_code || "--"} • {examForm.faculty || "--"} • {examForm.program || "--"}
                   </p>
                   {activeExamTerm?.start_date && activeExamTerm?.end_date ? (
                     <p className="helper-text">
-                      Pháº¡m vi há»c ká»³: {activeExamTerm.start_date} Ä‘áº¿n {activeExamTerm.end_date}
+                      Phạm vi học kỳ: {activeExamTerm.start_date} đến {activeExamTerm.end_date}
                     </p>
                   ) : null}
                 </div>
                 <button className="secondary-button" type="button" onClick={() => setModalType(null)}>
-                  ÄÃ³ng
+                  Đóng
                 </button>
               </div>
 
               <div className="inline-form">
                 <label className="field-group">
-                  <span>MÃ´n há»c</span>
-                  <select value={examForm.course_id} onChange={(event) => setExamForm((prev) => ({ ...prev, course_id: event.target.value, section_id: "" }))} required>
-                    <option value="">Chá»n mÃ´n há»c</option>
-                    {courseOptions.map((subject) => (
-                      <option key={`${subject.term_id || "termless"}-${subject.course_id}`} value={subject.course_id}>
-                        {subject.course_name} ({subject.course_code})
-                      </option>
-                    ))}
-                  </select>
+                  <span>Môn học</span>
+                  <CustomSelect
+                    value={examForm.course_id}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, course_id: val, section_id: "" }))}
+                    options={[{ value: "", label: "Chọn môn học" }, ...courseOptions.map((s) => ({ value: s.course_id, label: `${s.course_name} (${s.course_code})` }))]}
+                    placeholder="Chọn môn học"
+                  />
                 </label>
                 <label className="field-group">
-                  <span>Lá»›p há»c pháº§n</span>
-                  <select value={examForm.section_id} onChange={(event) => setExamForm((prev) => ({ ...prev, section_id: event.target.value }))} required>
-                    <option value="">Chá»n lá»›p há»c pháº§n</option>
-                    {formSections.map((section) => (
-                      <option key={section.id} value={section.id}>
-                        {section.section_code} - {section.course_name}
-                      </option>
-                    ))}
-                  </select>
+                  <span>Lớp học phần</span>
+                  <CustomSelect
+                    value={examForm.section_id}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, section_id: val }))}
+                    options={[{ value: "", label: "Chọn lớp học phần" }, ...formSections.map((sec) => ({ value: sec.id, label: `${sec.section_code} - ${sec.course_name}` }))]}
+                    placeholder="Chọn lớp học phần"
+                  />
                 </label>
                 <label className="field-group">
-                  <span>NgÃ y thi</span>
+                  <span>Ngày thi</span>
                   <input type="date" value={examForm.exam_date} onChange={(event) => setExamForm((prev) => ({ ...prev, exam_date: event.target.value }))} required />
                 </label>
                 <label className="field-group">
-                  <span>Tráº¡ng thÃ¡i</span>
-                  <select value={examForm.status} onChange={(event) => setExamForm((prev) => ({ ...prev, status: event.target.value }))}>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="draft">Draft</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
+                  <span>Trạng thái</span>
+                  <CustomSelect
+                    value={examForm.status}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, status: val }))}
+                    options={[
+                      { value: "scheduled", label: "Đã lên lịch" },
+                      { value: "draft", label: "Bản nháp" },
+                      { value: "cancelled", label: "Đã hủy" },
+                    ]}
+                    placeholder="Chọn trạng thái"
+                  />
                 </label>
               </div>
 
               <div className="inline-form">
                 <label className="field-group">
-                  <span>Giá» báº¯t Ä‘áº§u</span>
+                  <span>Giờ bắt đầu</span>
                   <input type="time" value={examForm.start_time} onChange={(event) => setExamForm((prev) => ({ ...prev, start_time: event.target.value }))} />
                 </label>
                 <label className="field-group">
-                  <span>Giá» káº¿t thÃºc</span>
+                  <span>Giờ kết thúc</span>
                   <input type="time" value={examForm.end_time} onChange={(event) => setExamForm((prev) => ({ ...prev, end_time: event.target.value }))} />
                 </label>
                 <label className="field-group">
-                  <span>PhÃ²ng thi</span>
+                  <span>Phòng thi</span>
                   <input value={examForm.room} onChange={(event) => setExamForm((prev) => ({ ...prev, room: event.target.value }))} />
                 </label>
                 <label className="field-group">
-                  <span>CÆ¡ sá»Ÿ</span>
+                  <span>Cơ sở</span>
                   <input value={examForm.location} onChange={(event) => setExamForm((prev) => ({ ...prev, location: event.target.value }))} />
                 </label>
               </div>
 
               <div className="inline-form">
                 <label className="field-group">
-                  <span>HÃ¬nh thá»©c thi</span>
-                  <select value={examForm.exam_type} onChange={(event) => setExamForm((prev) => ({ ...prev, exam_type: event.target.value }))} required>
-                    {EXAM_TYPE_OPTIONS.map((option) => (
-                      <option key={option.label} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <span>Hình thức thi</span>
+                  <CustomSelect
+                    value={examForm.exam_type}
+                    onChange={(val) => setExamForm((prev) => ({ ...prev, exam_type: val }))}
+                    options={EXAM_TYPE_OPTIONS}
+                    placeholder="Chọn hình thức thi"
+                  />
                 </label>
               </div>
 
               <div className="button-row">
-                <button className="primary-button" type="submit">{examForm.id ? "LÆ°u lá»‹ch thi" : "Táº¡o lá»‹ch thi"}</button>
+                <button className="primary-button" type="submit">{examForm.id ? "Lưu lịch thi" : "Tạo lịch thi"}</button>
                 <button className="secondary-button" type="button" onClick={() => setModalType(null)}>
-                  Há»§y
+                  Hủy
                 </button>
               </div>
             </form>

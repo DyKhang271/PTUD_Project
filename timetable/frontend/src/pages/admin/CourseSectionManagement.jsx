@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import StatusBadge from "../../components/StatusBadge";
+import CustomSelect from "../../components/CustomSelect";
 import {
   archiveCourseSection,
   assignSectionTeacher,
@@ -380,6 +381,58 @@ export default function CourseSectionManagement() {
     }
   }
 
+  const termSelectOptions = useMemo(() => [
+    { value: "", label: "Chọn học kỳ" },
+    ...state.terms.map((t) => ({ value: t.id, label: t.term_code }))
+  ], [state.terms]);
+
+  const facultySelectOptions = useMemo(() => [
+    { value: "", label: "Chọn khoa" },
+    ...facultyOptions.map((f) => ({ value: f, label: f }))
+  ], [facultyOptions]);
+
+  const programSelectOptions = useMemo(() => [
+    { value: "", label: "Chọn ngành / chương trình" },
+    ...programOptions.map((p) => ({ value: p, label: p }))
+  ], [programOptions]);
+
+  const courseSelectOptions = useMemo(() => [
+    { value: "", label: "Tất cả môn học" },
+    ...courseOptions.map((c) => ({
+      value: c.course_id,
+      label: `${c.course_name} (${c.course_code})`
+    }))
+  ], [courseOptions]);
+
+  const statusSelectOptions = [
+    { value: "", label: "Tất cả trạng thái" },
+    { value: "active", label: "Hoạt động" },
+    { value: "inactive", label: "Không hoạt động" },
+    { value: "archived", label: "Đã lưu trữ" }
+  ];
+
+  const modalCourseOptions = useMemo(() => [
+    { value: "", label: "Chọn môn học" },
+    ...courseOptions.map((c) => ({
+      value: c.course_id,
+      label: `${c.course_name} (${c.course_code})`
+    }))
+  ], [courseOptions]);
+
+  const modalStatusOptions = [
+    { value: "active", label: "Hoạt động" },
+    { value: "inactive", label: "Không hoạt động" },
+    { value: "archived", label: "Lưu trữ" }
+  ];
+
+  const modalTeacherOptions = useMemo(() => [
+    { value: "", label: "Chưa gán giảng viên" },
+    ...filteredTeacherOptions.map((t) => ({
+      value: t.teacher_id,
+      label: `${t.teacher_name} (${t.teacher_id})`
+    }))
+  ], [filteredTeacherOptions]);
+
   if (state.loading && !state.terms.length) return <LoadingState label="Đang tải module lớp học phần..." />;
   if (state.error && !state.terms.length) return <ErrorState message={state.error} onRetry={() => load(filters)} />;
 
@@ -396,84 +449,64 @@ export default function CourseSectionManagement() {
         <div className="admin-filter-grid">
           <label className="field-group">
             <span>Học kỳ</span>
-            <select
+            <CustomSelect
               value={filters.term_id}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  term_id: event.target.value,
+                  term_id: val,
                   faculty: "",
                   program: "",
                   course_id: "",
                   search: "",
                 })
               }
-            >
-              <option value="">Chọn học kỳ</option>
-              {state.terms.map((term) => (
-                <option key={term.id} value={term.id}>
-                  {term.term_code}
-                </option>
-              ))}
-            </select>
+              options={termSelectOptions}
+              placeholder="Chọn học kỳ"
+            />
           </label>
 
           <label className="field-group">
             <span>Khoa</span>
-            <select
+            <CustomSelect
               value={filters.faculty}
               disabled={!filters.term_id || isUnclassifiedMode}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  faculty: event.target.value,
+                  faculty: val,
                   program: "",
                   course_id: "",
                 })
               }
-            >
-              <option value="">Chọn khoa</option>
-              {facultyOptions.map((faculty) => (
-                <option key={faculty} value={faculty}>
-                  {faculty}
-                </option>
-              ))}
-            </select>
+              options={facultySelectOptions}
+              placeholder="Chọn khoa"
+            />
           </label>
 
           <label className="field-group">
             <span>Ngành / Chương trình</span>
-            <select
+            <CustomSelect
               value={filters.program}
               disabled={!filters.faculty || isUnclassifiedMode}
-              onChange={(event) =>
+              onChange={(val) =>
                 updateFilters({
-                  program: event.target.value,
+                  program: val,
                   course_id: "",
                 })
               }
-            >
-              <option value="">Chọn ngành / chương trình</option>
-              {programOptions.map((program) => (
-                <option key={program} value={program}>
-                  {program}
-                </option>
-              ))}
-            </select>
+              options={programSelectOptions}
+              placeholder="Chọn ngành / chương trình"
+            />
           </label>
 
           <label className="field-group">
             <span>Môn học</span>
-            <select
+            <CustomSelect
               value={filters.course_id}
               disabled={!contextReady || isUnclassifiedMode}
-              onChange={(event) => updateFilters({ course_id: event.target.value })}
-            >
-              <option value="">Tất cả môn học</option>
-              {courseOptions.map((course) => (
-                <option key={`${course.term_id || "termless"}-${course.course_id}`} value={course.course_id}>
-                  {course.course_name} ({course.course_code})
-                </option>
-              ))}
-            </select>
+              onChange={(val) => updateFilters({ course_id: val })}
+              options={courseSelectOptions}
+              placeholder="Tất cả môn học"
+            />
           </label>
 
           <label className="field-group">
@@ -487,12 +520,12 @@ export default function CourseSectionManagement() {
 
           <label className="field-group">
             <span>Trạng thái</span>
-            <select value={filters.status} onChange={(event) => updateFilters({ status: event.target.value })}>
-              <option value="">Tất cả trạng thái</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="archived">Archived</option>
-            </select>
+            <CustomSelect
+              value={filters.status}
+              onChange={(val) => updateFilters({ status: val })}
+              options={statusSelectOptions}
+              placeholder="Tất cả trạng thái"
+            />
           </label>
         </div>
 
@@ -649,25 +682,19 @@ export default function CourseSectionManagement() {
               <div className="inline-form">
                 <label className="field-group">
                   <span>Môn học</span>
-                  <select
+                  <CustomSelect
                     value={form.course_code}
-                    onChange={(event) => {
-                      const selected = courseOptions.find((course) => course.course_id === event.target.value);
+                    onChange={(val) => {
+                      const selected = courseOptions.find((course) => course.course_id === val);
                       setForm((prev) => ({
                         ...prev,
-                        course_code: event.target.value,
+                        course_code: val,
                         course_name: selected?.course_name || "",
                       }));
                     }}
-                    required
-                  >
-                    <option value="">Chọn môn học</option>
-                    {courseOptions.map((course) => (
-                      <option key={`${course.term_id || "termless"}-${course.course_id}`} value={course.course_id}>
-                        {course.course_name} ({course.course_code})
-                      </option>
-                    ))}
-                  </select>
+                    options={modalCourseOptions}
+                    placeholder="Chọn môn học"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Mã lớp học phần</span>
@@ -675,11 +702,12 @@ export default function CourseSectionManagement() {
                 </label>
                 <label className="field-group">
                   <span>Trạng thái</span>
-                  <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="archived">Archived</option>
-                  </select>
+                  <CustomSelect
+                    value={form.status}
+                    onChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
+                    options={modalStatusOptions}
+                    placeholder="Chọn trạng thái"
+                  />
                 </label>
                 <label className="field-group">
                   <span>Capacity</span>
@@ -704,17 +732,12 @@ export default function CourseSectionManagement() {
                 </label>
                 <label className="field-group">
                   <span>Giảng viên</span>
-                  <select
+                  <CustomSelect
                     value={form.teacher_external_id}
-                    onChange={(event) => setForm((prev) => ({ ...prev, teacher_external_id: event.target.value }))}
-                  >
-                    <option value="">Chưa gán giảng viên</option>
-                    {filteredTeacherOptions.map((teacher) => (
-                      <option key={teacher.teacher_id} value={teacher.teacher_id}>
-                        {teacher.teacher_name} ({teacher.teacher_id})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setForm((prev) => ({ ...prev, teacher_external_id: val }))}
+                    options={modalTeacherOptions}
+                    placeholder="Chưa gán giảng viên"
+                  />
                 </label>
               </div>
 

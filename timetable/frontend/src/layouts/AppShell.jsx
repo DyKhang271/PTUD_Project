@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -11,10 +12,21 @@ function SidebarLink({ to, label }) {
 
 export default function AppShell({ title, links }) {
   const { user, logout } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "light");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
         <div className="sidebar-brand">
           <span className="sidebar-eyebrow">🎓 IUH Portal</span>
           <h1>{title}</h1>
@@ -25,11 +37,21 @@ export default function AppShell({ title, links }) {
           ))}
         </nav>
       </aside>
-      <div className="content-shell">
+      <div className={`content-shell ${isCollapsed ? "collapsed" : ""}`}>
         <header className="topbar">
-          <div>
-            <div className="topbar-title">{user?.full_name || "Người dùng"}</div>
-            <div className="topbar-subtitle">{user?.role}</div>
+          <div className="topbar-left">
+            <button className="sidebar-toggle-btn" onClick={() => setIsCollapsed(!isCollapsed)} title={isCollapsed ? "Mở rộng menu" : "Thu gọn menu"}>
+              {isCollapsed ? "☰" : "✕"}
+            </button>
+            <button className="theme-toggle-btn" onClick={toggleTheme} title={theme === "light" ? "Chuyển sang chế độ tối" : "Chuyển sang chế độ sáng"}>
+              {theme === "light" ? "🌙" : "☀️"}
+            </button>
+            <div>
+              <div className="topbar-title">{user?.full_name || "Người dùng"}</div>
+              <div className="topbar-subtitle">
+                {user?.role === "student" ? "Sinh viên" : user?.role === "teacher" ? "Giảng viên" : user?.role === "admin" ? "Quản trị viên" : user?.role}
+              </div>
+            </div>
           </div>
           <button className="secondary-button" onClick={logout}>
             Đăng xuất

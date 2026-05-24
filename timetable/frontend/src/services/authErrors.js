@@ -1,11 +1,11 @@
 const AUTH_NOTICE_KEY = "timetable_auth_notice";
 
 export const AUTH_ERROR_MESSAGES = {
-  invalid_credentials: "Tai khoan hoac mat khau khong dung",
-  access_denied: "Tai khoan khong co quyen truy cap he thong thoi khoa bieu",
-  login_unreachable: "Khong the ket noi may chu dang nhap",
-  session_expired: "Phien dang nhap da het han, vui long dang nhap lai",
-  invalid_auth_response: "Khong the xac thuc phien dang nhap",
+  invalid_credentials: "Tài khoản hoặc mật khẩu không đúng",
+  access_denied: "Tài khoản không có quyền truy cập hệ thống thời khóa biểu",
+  login_unreachable: "Không thể kết nối máy chủ đăng nhập",
+  session_expired: "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
+  invalid_auth_response: "Không thể xác thực phiên đăng nhập",
 };
 
 export class AuthError extends Error {

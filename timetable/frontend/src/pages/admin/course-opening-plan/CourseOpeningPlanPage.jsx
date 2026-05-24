@@ -89,7 +89,7 @@ export default function CourseOpeningPlanPage() {
     } catch (error) {
       setBootstrap({
         loading: false,
-        error: buildErrorMessage(error, "Khong tai duoc bo loc ke hoach mo lop."),
+        error: buildErrorMessage(error, "Không tải được bộ lọc kế hoạch mở lớp."),
         faculties: [],
         programs: [],
         cohorts: [],
@@ -123,7 +123,7 @@ export default function CourseOpeningPlanPage() {
         if (cancelled) return;
         setPlanState({
           loading: false,
-          error: buildErrorMessage(error, "Khong tai duoc ke hoach mo lop."),
+          error: buildErrorMessage(error, "Không tải được kế hoạch mở lớp."),
           data: null,
         });
       }
@@ -185,7 +185,7 @@ export default function CourseOpeningPlanPage() {
     } catch (error) {
       setFeedback({
         type: "error",
-        message: buildErrorMessage(error, "Khong thuc hien duoc hanh dong quan tri."),
+        message: buildErrorMessage(error, "Không thực hiện được hành động quản trị."),
       });
     } finally {
       setActionLoading((prev) => ({ ...prev, [actionKey]: false }));
@@ -200,7 +200,7 @@ export default function CourseOpeningPlanPage() {
   }, [planState.data, selectedCourseCode]);
 
   if (bootstrap.loading) {
-    return <LoadingState label="Dang tai du lieu bo loc ke hoach mo lop..." />;
+    return <LoadingState label="Đang tải dữ liệu bộ lọc kế hoạch mở lớp..." />;
   }
 
   if (bootstrap.error) {
@@ -221,24 +221,24 @@ export default function CourseOpeningPlanPage() {
           runAction(
             "importCurriculum",
             () => importCoreCurriculum(),
-            "Da dong bo CT khung hoac kich hoat fallback tu Student Portal.",
+            "Đã đồng bộ chương trình khung hoặc kích hoạt chế độ dự phòng từ Student Portal.",
           )
         }
         onImportSections={() =>
           runAction(
             "importSections",
             () => importCurrentTermSections(filters.term_code),
-            "Da dong bo lop hoc phan cua hoc ky thuc te.",
+            "Đã đồng bộ lớp học phần của học kỳ thực tế.",
           )
         }
         onSuggestPlan={() =>
-          runAction("suggestPlan", () => suggestCourseOpeningPlan(filters), "Da cap nhat de xuat mo lop theo CT khung.")
+          runAction("suggestPlan", () => suggestCourseOpeningPlan(filters), "Đã cập nhật đề xuất mở lớp theo chương trình khung.")
         }
         onBulkCreate={() =>
           runAction(
             "bulkCreate",
             () => bulkCreateSectionsFromPlan(filters),
-            "Da xu ly yeu cau tao lop hoc phan cho cac mon con thieu.",
+            "Đã xử lý yêu cầu tạo lớp học phần cho các môn còn thiếu.",
           )
         }
         actionLoading={actionLoading}
@@ -250,13 +250,13 @@ export default function CourseOpeningPlanPage() {
       ) : null}
 
       {!hasEnoughFilters(filters) ? (
-        <EmptyState message="Vui long chon Khoa, Chuong trinh, Khoa va Hoc ky de xem ke hoach mo lop." />
+        <EmptyState message="Vui lòng chọn Khoa, Chương trình, Khóa và Học kỳ để xem kế hoạch mở lớp." />
       ) : planState.loading ? (
-        <LoadingState label="Dang tong hop ke hoach mo lop..." />
+        <LoadingState label="Đang tổng hợp kế hoạch mở lớp..." />
       ) : planState.error ? (
         <ErrorState message={planState.error} onRetry={() => setFilters((prev) => ({ ...prev }))} />
       ) : !planState.data?.courses?.length ? (
-        <EmptyState message="Chua co du lieu ke hoach mo lop cho lua chon nay." />
+        <EmptyState message="Chưa có dữ liệu kế hoạch mở lớp cho lựa chọn này." />
       ) : (
         <>
           {planState.data.meta?.notes?.length ? (

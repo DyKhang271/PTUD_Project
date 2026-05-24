@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "../../components/DataState";
 import StatusBadge from "../../components/StatusBadge";
+import CustomSelect from "../../components/CustomSelect";
 import { fetchStudentAttendanceHistory } from "../../services/studentApi";
 
 const statuses = [
@@ -59,6 +60,16 @@ export default function StudentAttendanceHistory() {
     return { total, present, late, absent, excused, rate };
   }, [filteredItems]);
 
+  const termOptions = useMemo(() => [
+    { value: "all", label: "Tất cả" },
+    ...terms.map((t) => ({ value: t, label: t }))
+  ], [terms]);
+
+  const courseOptions = useMemo(() => [
+    { value: "all", label: "Tất cả" },
+    ...courses.map((c) => ({ value: c, label: c }))
+  ], [courses]);
+
   if (state.loading) return <LoadingState label="Đang tải lịch sử điểm danh..." />;
   if (state.error) return <ErrorState message={state.error} onRetry={load} />;
 
@@ -81,25 +92,33 @@ export default function StudentAttendanceHistory() {
       <div className="panel plan-filter-grid">
         <label className="field-group">
           <span>Học kỳ</span>
-          <select value={filters.term} onChange={(event) => setFilters((prev) => ({ ...prev, term: event.target.value }))}>
-            <option value="all">Tất cả</option>
-            {terms.map((term) => <option key={term} value={term}>{term}</option>)}
-          </select>
+          <CustomSelect
+            value={filters.term}
+            onChange={(val) => setFilters((prev) => ({ ...prev, term: val }))}
+            options={termOptions}
+            placeholder="Tất cả học kỳ"
+          />
         </label>
         <label className="field-group">
           <span>Môn học</span>
-          <select value={filters.course} onChange={(event) => setFilters((prev) => ({ ...prev, course: event.target.value }))}>
-            <option value="all">Tất cả</option>
-            {courses.map((course) => <option key={course} value={course}>{course}</option>)}
-          </select>
+          <CustomSelect
+            value={filters.course}
+            onChange={(val) => setFilters((prev) => ({ ...prev, course: val }))}
+            options={courseOptions}
+            placeholder="Tất cả môn học"
+          />
         </label>
         <label className="field-group">
           <span>Trạng thái</span>
-          <select value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}>
-            {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
-          </select>
+          <CustomSelect
+            value={filters.status}
+            onChange={(val) => setFilters((prev) => ({ ...prev, status: val }))}
+            options={statuses}
+            placeholder="Tất cả trạng thái"
+          />
         </label>
       </div>
+
 
       <div className="table-card">
         {filteredItems.length ? (
