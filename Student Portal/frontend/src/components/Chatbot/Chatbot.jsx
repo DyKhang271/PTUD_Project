@@ -123,6 +123,27 @@ export default function Chatbot() {
     }
   };
 
+  const deleteSession = (event, id) => {
+    event.stopPropagation();
+    const session = sessions.find((x) => x.id === id);
+    const title = session?.title || 'đoạn chat này';
+    if (!window.confirm(`Xóa cuộc trò chuyện "${title}"?`)) return;
+
+    const nextSessions = sessions.filter((x) => x.id !== id);
+    setSessions(nextSessions);
+
+    if (id === activeSessionId) {
+      const nextSession = nextSessions[0];
+      if (nextSession) {
+        setActiveSessionId(nextSession.id);
+        setMessages(nextSession.messages || []);
+      } else {
+        setActiveSessionId(buildSessionId());
+        setMessages([]);
+      }
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -207,6 +228,15 @@ export default function Chatbot() {
             >
               <div className={styles.historyIcon}>💬</div>
               <div className={styles.historyTitle}>{s.title}</div>
+              <button
+                type="button"
+                className={styles.deleteHistoryBtn}
+                onClick={(event) => deleteSession(event, s.id)}
+                title="Xóa cuộc trò chuyện"
+                aria-label={`Xóa cuộc trò chuyện ${s.title || ''}`}
+              >
+                ×
+              </button>
             </div>
           ))}
         </div>
