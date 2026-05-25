@@ -1,13 +1,20 @@
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 
 
-PORTAL_LOGIN_URL = "http://backend:8000/api/auth/admin-login"
-TIMETABLE_SOURCE_TERMS_URL = "http://timetable-backend:8001/admin/import/source-terms"
-TIMETABLE_SEED_URL = "http://timetable-backend:8001/admin/import/seed-from-core"
+PORTAL_LOGIN_URL = os.getenv("PORTAL_LOGIN_URL", "http://host.docker.internal:8000/api/auth/admin-login")
+TIMETABLE_SOURCE_TERMS_URL = os.getenv(
+    "TIMETABLE_SOURCE_TERMS_URL",
+    "http://backend:8001/admin/import/source-terms",
+)
+TIMETABLE_SEED_URL = os.getenv(
+    "TIMETABLE_SEED_URL",
+    "http://backend:8001/admin/import/seed-from-core",
+)
 
 
 def request_json(url: str, *, method: str = "GET", token: str | None = None, payload: dict | None = None) -> dict:
