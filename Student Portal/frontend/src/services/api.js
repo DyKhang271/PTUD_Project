@@ -32,7 +32,7 @@ export const getCurriculum = (mssv) =>
 
 export const sendChatMessage = (payload) =>
   api.post('/chatbot', typeof payload === 'string' ? { message: payload } : payload, {
-    timeout: 30000,
+    timeout: 120000,
   });
 
 export const studentLogin = (mssv, password) =>

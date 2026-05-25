@@ -419,6 +419,7 @@ def _should_use_direct_course_lookup(intent: str, message: str) -> bool:
             "qua mon",
             "rot mon",
             "dat mon",
+            "diem",
         )
     )
     return any(
