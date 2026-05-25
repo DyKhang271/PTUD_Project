@@ -44,6 +44,8 @@ Các port cần trống:
 | `5433` | PostgreSQL của Timetable |
 | `11434` | Ollama API |
 
+Model chatbot mặc định là [`qwen2.5:3b-instruct`](https://ollama.com/library/qwen2.5:3b-instruct) theo thư viện chính thức của Ollama. Model này hỗ trợ tiếng Việt và có kích thước khoảng 1.9 GB.
+
 ## Chạy nhanh
 
 ### Windows
@@ -66,6 +68,7 @@ Script sẽ:
 - build và chạy Timetable;
 - chạy migration cho Timetable;
 - kiểm tra API/frontend của cả 2 hệ thống;
+- tự tải model Ollama `qwen2.5:3b-instruct` nếu máy chưa có;
 - seed dữ liệu demo Timetable từ Student Portal.
 
 ## Chạy thủ công
@@ -134,6 +137,26 @@ docker compose --profile bootstrap run --rm bootstrap-demo
 ```
 
 Lưu ý: `docker compose down -v` sẽ xóa dữ liệu trong volume PostgreSQL và Ollama của project.
+
+## Kiểm tra chatbot AI / Ollama
+
+Kiểm tra model đã có trong Ollama:
+
+```bash
+docker compose exec ollama ollama list
+```
+
+Nếu cần tải lại model thủ công:
+
+```bash
+docker compose exec ollama ollama pull qwen2.5:3b-instruct
+```
+
+Backend Student Portal dùng biến:
+
+```text
+OLLAMA_MODEL=qwen2.5:3b-instruct
+```
 
 ## Chạy không cần Ollama
 

@@ -52,7 +52,7 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"
       REFRESH_TOKEN_EXPIRE_DAYS: "7"
       OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_MODEL: gemma4:31b-cloud
+      OLLAMA_MODEL: qwen2.5:3b-instruct
       RAG_DOCUMENTS_DIR: /rag_docs
       PYTHONUNBUFFERED: "1"
     ports:

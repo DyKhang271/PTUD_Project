@@ -49,6 +49,12 @@ wait_for_http "Student Portal API" "http://localhost:8000/"
 wait_for_http "Student Portal frontend" "http://localhost:8080/"
 wait_for_http "Timetable API" "http://localhost:8001/"
 wait_for_http "Timetable frontend" "http://localhost:5174/"
+wait_for_http "Ollama API" "http://localhost:11434/api/tags"
+
+if ! docker compose exec -T ollama ollama show qwen2.5:3b-instruct >/dev/null 2>&1; then
+  echo "Pulling Ollama model qwen2.5:3b-instruct..."
+  docker compose exec -T ollama ollama pull qwen2.5:3b-instruct
+fi
 
 echo "Bootstrapping Timetable demo data..."
 docker compose --profile bootstrap run --rm bootstrap-demo
