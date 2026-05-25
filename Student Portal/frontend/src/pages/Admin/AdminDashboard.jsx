@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   getAdminStudents, createAdminStudent, updateAdminStudentPassword, updateAdminStudent, deleteAdminStudent, bulkImportAdminStudents,
   getSystemConfig, updateSystemConfig,
@@ -8,15 +7,10 @@ import {
   getAdminSchedule, createAdminSchedule, updateAdminSchedule, deleteAdminSchedule,
   getAdminNotifications, createAdminNotification, updateAdminNotification, deleteAdminNotification
 } from '../../services/api';
-import AdminTimetableImport from './AdminTimetableImport';
 import styles from './AdminDashboard.module.css';
 
 export default function AdminDashboard() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState(
-    location.pathname === '/admin/timetable-import' ? 'timetableImport' : 'students'
-  );
+  const [activeTab, setActiveTab] = useState('students');
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
 
@@ -81,12 +75,6 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => {
-    if (location.pathname === '/admin/timetable-import') {
-      setActiveTab('timetableImport');
-    }
-  }, [location.pathname]);
-
   useEffect(() => { fetchData() }, []);
 
   const showToast = (msg) => {
@@ -96,13 +84,6 @@ export default function AdminDashboard() {
 
   const switchTab = (tab) => {
     setActiveTab(tab);
-    if (tab === 'timetableImport') {
-      navigate('/admin/timetable-import');
-      return;
-    }
-    if (location.pathname !== '/admin') {
-      navigate('/admin');
-    }
   };
 
   // --- CSV Handlers ---
@@ -326,7 +307,6 @@ export default function AdminDashboard() {
         <div className={`${styles.menuItem} ${activeTab === 'students' ? styles.menuItemActive : ''}`} onClick={() => switchTab('students')}>🎓 Sinh viên</div>
         <div className={`${styles.menuItem} ${activeTab === 'teachers' ? styles.menuItemActive : ''}`} onClick={() => switchTab('teachers')}>👨‍🏫 Giảng viên</div>
         <div className={`${styles.menuItem} ${activeTab === 'schedule' ? styles.menuItemActive : ''}`} onClick={() => switchTab('schedule')}>📅 Thời khoá biểu</div>
-        <div className={`${styles.menuItem} ${activeTab === 'timetableImport' ? styles.menuItemActive : ''}`} onClick={() => switchTab('timetableImport')}>🗂️ Import TKB</div>
         <div className={`${styles.menuItem} ${activeTab === 'notifications' ? styles.menuItemActive : ''}`} onClick={() => switchTab('notifications')}>📢 Thông báo</div>
         <div className={`${styles.menuItem} ${activeTab === 'settings' ? styles.menuItemActive : ''}`} onClick={() => switchTab('settings')}>⚙️ Cấu hình hệ thống</div>
       </aside>
@@ -457,10 +437,6 @@ export default function AdminDashboard() {
             ))}
             {!loading && schedule.length === 0 && <div className={styles.card}><div className={styles.emptyCell}>Chưa có lớp học phần nào.</div></div>}
           </>
-        )}
-
-        {activeTab === 'timetableImport' && (
-          <AdminTimetableImport showToast={showToast} />
         )}
 
         {activeTab === 'notifications' && (

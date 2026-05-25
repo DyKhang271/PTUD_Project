@@ -8,38 +8,12 @@ const api = axios.create({
   },
 });
 
-const TIMETABLE_TOKEN_KEY = 'timetable_access_token';
-
-const timetableApi = axios.create({
-  baseURL: import.meta.env.VITE_TIMETABLE_API_BASE_URL || 'http://localhost:8001',
-  timeout: 20000,
-});
-
-timetableApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TIMETABLE_TOKEN_KEY);
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 const withStudentParams = (mssv, extraParams = {}) => ({
   params: {
     ...(mssv ? { mssv } : {}),
     ...extraParams,
   },
 });
-
-export const setTimetableAccessToken = (token) => {
-  if (token) {
-    localStorage.setItem(TIMETABLE_TOKEN_KEY, token);
-  } else {
-    localStorage.removeItem(TIMETABLE_TOKEN_KEY);
-  }
-};
-
-export const getTimetableAccessToken = () => localStorage.getItem(TIMETABLE_TOKEN_KEY);
 
 export const getStudent = (mssv) => api.get('/student', withStudentParams(mssv));
 
@@ -140,48 +114,5 @@ export const getAdminNotifications = () => api.get('/admin/notifications');
 export const createAdminNotification = (data) => api.post('/admin/notifications', data);
 export const updateAdminNotification = (id, data) => api.put(`/admin/notifications/${id}`, data);
 export const deleteAdminNotification = (id) => api.delete(`/admin/notifications/${id}`);
-
-export const timetableAdminLogin = async (username, password) => {
-  const response = await adminLogin(username, password);
-  setTimetableAccessToken(response.data?.access_token);
-  return response;
-};
-
-export const getTimetableSourceTerms = () => timetableApi.get('/admin/import/source-terms');
-
-export const importCoreSections = (termCode, limit = 100) =>
-  timetableApi.post('/admin/import/core-sections', {
-    term_code: termCode,
-    limit,
-  });
-
-export const getCourseSections = (termCode) =>
-  timetableApi.get('/course-sections', {
-    params: { term_code: termCode },
-  });
-
-export const downloadTimetableCsvScaffold = (termCode, includeOptional = true) =>
-  timetableApi.get('/admin/import/timetable-entries/csv-scaffold', {
-    params: {
-      term_code: termCode,
-      include_optional: includeOptional,
-    },
-    responseType: 'blob',
-  });
-
-export const uploadTimetableCsv = (file) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  return timetableApi.post('/admin/import/timetable-entries/csv', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
-};
-
-export const getTimetableDebugSummary = (termCode) =>
-  timetableApi.get('/admin/import/debug-summary', {
-    params: { term_code: termCode },
-  });
 
 export default api;

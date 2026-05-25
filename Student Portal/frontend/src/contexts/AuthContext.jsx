@@ -30,7 +30,6 @@ export function AuthProvider({ children }) {
     setRole(null);
     localStorage.removeItem('portal_user');
     localStorage.removeItem('portal_role');
-    localStorage.removeItem('timetable_access_token');
   };
 
   const isParent = role === 'parent';

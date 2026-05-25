@@ -135,7 +135,6 @@ function AppRoutes() {
         {isAdmin ? (
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/timetable-import" element={<AdminDashboard />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
         ) : isTeacher ? (

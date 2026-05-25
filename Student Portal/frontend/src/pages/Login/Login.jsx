@@ -7,7 +7,6 @@ import {
   getAvailableTeachers,
   parentLogin,
   studentLogin,
-  timetableAdminLogin,
   teacherLogin,
 } from '../../services/api';
 import styles from './Login.module.css';
@@ -185,7 +184,6 @@ export default function Login() {
       if (mssv.trim() === 'admin') {
         const res = await adminLogin('admin', password);
         if (res.data.success) {
-          await timetableAdminLogin('admin', password);
           login(res.data.admin, 'admin');
           navigate('/admin');
           return;

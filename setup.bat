@@ -27,23 +27,18 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Starting full system with Docker Compose...
+echo Starting Student Portal with Docker Compose...
 docker compose up -d --build
 if errorlevel 1 exit /b 1
 
 call :wait_for_http "Student Portal API" "http://localhost:8000/" 60 || exit /b 1
 call :wait_for_http "Student Portal frontend" "http://localhost:8080/" 60 || exit /b 1
-call :wait_for_http "Timetable API" "http://localhost:8001/" 60 || exit /b 1
-call :wait_for_http "Timetable frontend" "http://localhost:5174/" 60 || exit /b 1
-call :wait_for_bootstrap 60 || exit /b 1
 
 echo.
-echo System is ready.
+echo Student Portal is ready.
 echo.
-echo Student Portal frontend: http://localhost:8080
-echo Student Portal API:      http://localhost:8000
-echo Timetable frontend:      http://localhost:5174
-echo Timetable API:           http://localhost:8001
+echo Frontend: http://localhost:8080
+echo API:      http://localhost:8000
 echo.
 echo Demo accounts:
 echo - Admin: admin / admin
@@ -69,33 +64,4 @@ for /L %%I in (1,1,%MAX_ATTEMPTS%) do (
 )
 
 echo %SERVICE_NAME% did not become ready: %SERVICE_URL%
-exit /b 1
-
-:wait_for_bootstrap
-set "MAX_ATTEMPTS=%~1"
-
-for /L %%I in (1,1,%MAX_ATTEMPTS%) do (
-  docker inspect bootstrap-demo >nul 2>nul
-  if errorlevel 1 (
-    echo Waiting for bootstrap-demo container ^(%%I/%MAX_ATTEMPTS%%^)...
-    timeout /t 5 /nobreak >nul
-  ) else (
-    for /f "usebackq tokens=1,2" %%A in (`docker inspect -f "{{.State.Status}} {{.State.ExitCode}}" bootstrap-demo`) do (
-      if "%%A %%B"=="exited 0" (
-        echo Demo data bootstrap completed.
-        exit /b 0
-      )
-      if "%%A"=="exited" (
-        echo bootstrap-demo failed with state: %%A %%B
-        docker logs bootstrap-demo
-        exit /b 1
-      )
-    )
-    echo Waiting for bootstrap-demo to finish ^(%%I/%MAX_ATTEMPTS%%^)...
-    timeout /t 5 /nobreak >nul
-  )
-)
-
-echo bootstrap-demo did not finish in time.
-docker logs bootstrap-demo
 exit /b 1
