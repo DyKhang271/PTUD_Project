@@ -133,7 +133,8 @@ function computeOverlapLayout(events) {
 
   for (const event of positioned) {
     for (let index = active.length - 1; index >= 0; index -= 1) {
-      if (active[index].endMinutes <= event.startMinutes) {
+      // Tolerate minor nominal overlaps (up to 20 mins) between consecutive periods
+      if (active[index].endMinutes <= event.startMinutes + 20) {
         active.splice(index, 1);
       }
     }

@@ -540,7 +540,7 @@ def _choose_non_conflicting_blueprint(
     linked_student_ids: list[str],
     occupied_slots_by_student: dict[str, set[tuple[int, str, str]]],
 ) -> dict[str, Any]:
-    fallback_count = 6
+    fallback_count = 24
     primary = _build_generated_timetable_blueprint(section, index)
     candidates = [primary]
     for offset in range(1, fallback_count + 1):
@@ -798,6 +798,20 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
         section_lookup: dict[str, CourseSection] = {}
         timetable_lookup: dict[str, TimetableEntry] = {}
         occupied_slots_by_student: dict[str, set[tuple[int, str, str]]] = {}
+        for item in source_items:
+            sc = str(item.get("section_code") or "").strip()
+            if sc in SAMPLE_TIMETABLE_BY_SECTION:
+                blueprint = SAMPLE_TIMETABLE_BY_SECTION[sc]
+                slot_key = _blueprint_slot_key(blueprint)
+                l_ids = _extract_ids(item.get("student_ids") or [])
+                if requested_student_ids:
+                    r_set = set(student_profiles.keys()) or set(requested_student_ids)
+                    l_ids = [student_id for student_id in l_ids if student_id in r_set]
+                    if not l_ids:
+                        l_ids = [student_id for student_id in student_profiles.keys()]
+                for student_id in l_ids:
+                    occupied_slots_by_student.setdefault(student_id, set()).add(slot_key)
+
         preferred_faculty = next(
             (profile.get("faculty") for profile in student_profiles.values() if profile.get("faculty")),
             DEFAULT_FACULTY,
