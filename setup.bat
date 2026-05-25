@@ -27,18 +27,26 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Starting Student Portal with Docker Compose...
+echo Starting Student Portal and Timetable with Docker Compose...
 docker compose up -d --build
 if errorlevel 1 exit /b 1
 
 call :wait_for_http "Student Portal API" "http://localhost:8000/" 60 || exit /b 1
 call :wait_for_http "Student Portal frontend" "http://localhost:8080/" 60 || exit /b 1
+call :wait_for_http "Timetable API" "http://localhost:8001/" 60 || exit /b 1
+call :wait_for_http "Timetable frontend" "http://localhost:5174/" 60 || exit /b 1
+
+echo Bootstrapping Timetable demo data...
+docker compose --profile bootstrap run --rm bootstrap-demo
+if errorlevel 1 exit /b 1
 
 echo.
-echo Student Portal is ready.
+echo System is ready.
 echo.
-echo Frontend: http://localhost:8080
-echo API:      http://localhost:8000
+echo Student Portal frontend: http://localhost:8080
+echo Student Portal API:      http://localhost:8000
+echo Timetable frontend:      http://localhost:5174
+echo Timetable API:           http://localhost:8001
 echo.
 echo Demo accounts:
 echo - Admin: admin / admin

@@ -42,18 +42,25 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Starting Student Portal with Docker Compose..."
+echo "Starting Student Portal and Timetable with Docker Compose..."
 docker compose up -d --build
 
 wait_for_http "Student Portal API" "http://localhost:8000/"
 wait_for_http "Student Portal frontend" "http://localhost:8080/"
+wait_for_http "Timetable API" "http://localhost:8001/"
+wait_for_http "Timetable frontend" "http://localhost:5174/"
+
+echo "Bootstrapping Timetable demo data..."
+docker compose --profile bootstrap run --rm bootstrap-demo
 
 cat <<'EOF'
 
-Student Portal is ready.
+System is ready.
 
-Frontend: http://localhost:8080
-API:      http://localhost:8000
+Student Portal frontend: http://localhost:8080
+Student Portal API:      http://localhost:8000
+Timetable frontend:      http://localhost:5174
+Timetable API:           http://localhost:8001
 
 Demo accounts:
 - Admin: admin / admin

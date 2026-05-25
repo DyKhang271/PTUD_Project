@@ -1,0 +1,2 @@
+term_code,section_code,day_of_week,start_time,end_time,room,weeks,status
+REPLACE_WITH_TERM_CODE,REPLACE_WITH_REAL_SECTION_CODE,2,07:00,09:30,A1.01,1-15,published
