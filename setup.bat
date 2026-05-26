@@ -56,7 +56,7 @@ echo Student Portal API:      http://localhost:8000
 echo Timetable frontend:      http://localhost:5174
 echo Timetable API:           http://localhost:8001
 echo.
-echo Demo accounts:x` 
+echo Demo accounts:
 echo - Admin: admin / admin
 echo - Teacher: gvungdung / gvungdung
 echo - Teacher: gvaiml / gvaiml
