@@ -75,7 +75,11 @@ def is_time_overlap(new_start, new_end, old_start, old_end) -> bool:
     old_end_minutes = time_to_minutes(old_end)
     if None in (new_start_minutes, new_end_minutes, old_start_minutes, old_end_minutes):
         return False
-    return new_start_minutes < old_end_minutes and new_end_minutes > old_start_minutes
+    # Calculate overlap duration to tolerate minor changeover periods (up to 20 mins)
+    overlap_start = max(new_start_minutes, old_start_minutes)
+    overlap_end = min(new_end_minutes, old_end_minutes)
+    overlap_duration = overlap_end - overlap_start
+    return overlap_duration > 20
 
 
 def _entry_time_overlaps(entry: TimetableEntry, start_time, end_time) -> bool:
