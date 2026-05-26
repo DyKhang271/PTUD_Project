@@ -13,9 +13,9 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: PORTAL_JWT_SECRET
-        generateValue: true
+        sync: false
       - key: INTERNAL_API_KEY
-        generateValue: true
+        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: CHATBOT_AI_ENABLED
