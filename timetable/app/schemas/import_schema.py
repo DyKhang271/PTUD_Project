@@ -71,6 +71,8 @@ class ImportDebugSummaryLatestTimetableEntry(BaseModel):
     course_code: str
     course_name: str
     day_of_week: int
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
@@ -212,6 +214,7 @@ class AcademicImportBatchDetailRead(AcademicImportBatchRead):
 class TimetableEntriesImportItem(BaseModel):
     section_code: str = Field(min_length=1)
     day_of_week: int = Field(ge=1, le=7)
+    shift_code: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None

@@ -14,6 +14,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
+from app.core.schedule_shifts import STANDARD_SCHEDULE_SHIFTS
 from app.models.academic_term import AcademicTerm
 from app.models.attendance import AttendanceRecord, AttendanceSession
 from app.models.course_section import CourseSection, CourseSectionStudent
@@ -34,6 +35,13 @@ from app.schemas.import_schema import (
     TimetableEntriesImportResponse,
 )
 from app.services.core_api_client import CoreApiClient, normalize_student_payload, normalize_teacher_payload
+from app.services.timetable_service import (
+    ScheduleConflict,
+    assert_no_schedule_conflict,
+    find_schedule_conflict,
+    is_time_overlap,
+    normalize_timetable_shift_values,
+)
 
 
 DEFAULT_FACULTY = "Khoa Công nghệ Thông tin"
@@ -46,8 +54,6 @@ REQUIRED_TIMETABLE_CSV_COLUMNS = [
     "term_code",
     "section_code",
     "day_of_week",
-    "start_time",
-    "end_time",
     "room",
     "weeks",
     "status",
@@ -91,8 +97,10 @@ SAMPLE_TIMETABLE_BY_SECTION: dict[str, dict[str, Any]] = {
         "day_of_week": 2,
         "start_period": 4,
         "end_period": 6,
-        "start_time": time(9, 15),
-        "end_time": time(11, 45),
+        "shift_code": "CA2",
+        "shift_name": "Ca 2",
+        "start_time": time(9, 10),
+        "end_time": time(11, 40),
         "room": "H8.01",
         "location": "H (CS1)",
         "session_type": "practice",
@@ -101,8 +109,10 @@ SAMPLE_TIMETABLE_BY_SECTION: dict[str, dict[str, Any]] = {
         "day_of_week": 1,
         "start_period": 7,
         "end_period": 9,
-        "start_time": time(13, 0),
-        "end_time": time(15, 30),
+        "shift_code": "CA3",
+        "shift_name": "Ca 3",
+        "start_time": time(12, 30),
+        "end_time": time(15, 0),
         "room": "B1.12.2",
         "location": "B (CS1)",
         "session_type": "practice",
@@ -111,8 +121,10 @@ SAMPLE_TIMETABLE_BY_SECTION: dict[str, dict[str, Any]] = {
         "day_of_week": 5,
         "start_period": 4,
         "end_period": 6,
-        "start_time": time(9, 15),
-        "end_time": time(11, 45),
+        "shift_code": "CA2",
+        "shift_name": "Ca 2",
+        "start_time": time(9, 10),
+        "end_time": time(11, 40),
         "room": "H6.1",
         "location": "H (CS1)",
         "session_type": "practice",
@@ -121,8 +133,10 @@ SAMPLE_TIMETABLE_BY_SECTION: dict[str, dict[str, Any]] = {
         "day_of_week": 4,
         "start_period": 4,
         "end_period": 6,
-        "start_time": time(9, 15),
-        "end_time": time(11, 45),
+        "shift_code": "CA2",
+        "shift_name": "Ca 2",
+        "start_time": time(9, 10),
+        "end_time": time(11, 40),
         "room": "B1.11.2",
         "location": "B (CS1)",
         "session_type": "practice",
@@ -131,8 +145,10 @@ SAMPLE_TIMETABLE_BY_SECTION: dict[str, dict[str, Any]] = {
         "day_of_week": 6,
         "start_period": 7,
         "end_period": 9,
-        "start_time": time(13, 0),
-        "end_time": time(15, 30),
+        "shift_code": "CA3",
+        "shift_name": "Ca 3",
+        "start_time": time(12, 30),
+        "end_time": time(15, 0),
         "room": "A2.05",
         "location": "Co so 1",
         "session_type": "study",
@@ -342,10 +358,8 @@ def _validate_timetable_entry_write(
     section: CourseSection,
     values: dict[str, Any],
     existing: TimetableEntry | None = None,
-) -> None:
-    from app.services.timetable_service import _validate_conflicts
-
-    _validate_conflicts(
+) -> dict[str, Any]:
+    return assert_no_schedule_conflict(
         db,
         section=section,
         values=values,
@@ -357,30 +371,35 @@ def _upsert_timetable_entry(db: Session, *, section_id: UUID, blueprint: dict[st
     section = section_repo.get_section(db, section_id)
     if section is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
+    normalized_blueprint = normalize_timetable_shift_values(blueprint)
     entry = _get_timetable_entry(
         db,
         section_id=section_id,
-        day_of_week=int(blueprint["day_of_week"]),
-        start_period=blueprint.get("start_period"),
-        end_period=blueprint.get("end_period"),
+        day_of_week=int(normalized_blueprint["day_of_week"]),
+        start_period=normalized_blueprint.get("start_period"),
+        end_period=normalized_blueprint.get("end_period"),
     )
     values = {
         "section_id": section_id,
-        "day_of_week": int(blueprint["day_of_week"]),
-        "start_period": blueprint.get("start_period"),
-        "end_period": blueprint.get("end_period"),
-        "start_time": blueprint.get("start_time"),
-        "end_time": blueprint.get("end_time"),
-        "room": blueprint.get("room"),
-        "location": blueprint.get("location"),
-        "weeks": blueprint.get("weeks"),
+        "day_of_week": int(normalized_blueprint["day_of_week"]),
+        "start_period": normalized_blueprint.get("start_period"),
+        "end_period": normalized_blueprint.get("end_period"),
+        "shift_code": normalized_blueprint.get("shift_code"),
+        "shift_name": normalized_blueprint.get("shift_name"),
+        "start_time": normalized_blueprint.get("start_time"),
+        "end_time": normalized_blueprint.get("end_time"),
+        "room": normalized_blueprint.get("room"),
+        "location": normalized_blueprint.get("location"),
+        "weeks": normalized_blueprint.get("weeks"),
         "valid_from": DEFAULT_TIMETABLE_VALID_FROM,
         "valid_to": DEFAULT_TIMETABLE_VALID_TO,
-        "status": blueprint.get("status", "published"),
-        "session_type": blueprint.get("session_type", "study"),
-        "note": blueprint.get("note"),
+        "status": normalized_blueprint.get("status", "published"),
+        "session_type": normalized_blueprint.get("session_type", "study"),
+        "source": normalized_blueprint.get("source", "seed"),
+        "is_sample": normalized_blueprint.get("is_sample", True),
+        "note": normalized_blueprint.get("note"),
     }
-    _validate_timetable_entry_write(db, section=section, values=values, existing=entry)
+    values = _validate_timetable_entry_write(db, section=section, values=values, existing=entry)
     created = False
     if entry is None:
         entry = timetable_repo.create_timetable_entry(db, values)
@@ -410,176 +429,150 @@ def _resolve_session_date(day_of_week: int) -> date:
     return DEFAULT_TIMETABLE_VALID_FROM + timedelta(days=max(day_of_week - 1, 0))
 
 
+def _build_shift_blueprint(
+    *,
+    day_of_week: int,
+    shift_index: int,
+    room: str,
+    location: str,
+    session_type: str,
+) -> dict[str, Any]:
+    shift = STANDARD_SCHEDULE_SHIFTS[shift_index]
+    return {
+        "day_of_week": day_of_week,
+        "shift_code": shift.shift_code,
+        "shift_name": shift.shift_name,
+        "start_period": shift.start_period,
+        "end_period": shift.end_period,
+        "start_time": shift.start_time,
+        "end_time": shift.end_time,
+        "room": room,
+        "location": location,
+        "session_type": session_type,
+    }
+
+
 def _build_generated_timetable_blueprint(section: CourseSection, index: int) -> dict[str, Any]:
-    fallback_by_slot = [
-        {
-            "day_of_week": 1,
-            "start_period": 1,
-            "end_period": 3,
-            "start_time": time(7, 0),
-            "end_time": time(9, 30),
-            "room": "A1.01",
-            "location": "Co so 1",
-            "session_type": "study",
-        },
-        {
-            "day_of_week": 2,
-            "start_period": 4,
-            "end_period": 6,
-            "start_time": time(9, 15),
-            "end_time": time(11, 45),
-            "room": "B2.03",
-            "location": "Co so 1",
-            "session_type": "practice",
-        },
-        {
-            "day_of_week": 3,
-            "start_period": 7,
-            "end_period": 9,
-            "start_time": time(13, 0),
-            "end_time": time(15, 30),
-            "room": "C3.05",
-            "location": "Co so 2",
-            "session_type": "study",
-        },
-        {
-            "day_of_week": 4,
-            "start_period": 10,
-            "end_period": 12,
-            "start_time": time(18, 0),
-            "end_time": time(20, 30),
-            "room": "Online",
-            "location": "Truc tuyen",
-            "session_type": "online",
-        },
-        {
-            "day_of_week": 5,
-            "start_period": 1,
-            "end_period": 3,
-            "start_time": time(7, 0),
-            "end_time": time(9, 30),
-            "room": "H6.01",
-            "location": "Co so 1",
-            "session_type": "study",
-        },
-        {
-            "day_of_week": 6,
-            "start_period": 7,
-            "end_period": 9,
-            "start_time": time(13, 0),
-            "end_time": time(15, 30),
-            "room": "Lab A2",
-            "location": "Co so 1",
-            "session_type": "practice",
-        },
-        {
-            "day_of_week": 1,
-            "start_period": 4,
-            "end_period": 6,
-            "start_time": time(9, 15),
-            "end_time": time(11, 45),
-            "room": "A1.02",
-            "location": "Co so 1",
-            "session_type": "study",
-        },
-        {
-            "day_of_week": 2,
-            "start_period": 7,
-            "end_period": 9,
-            "start_time": time(13, 0),
-            "end_time": time(15, 30),
-            "room": "B2.04",
-            "location": "Co so 1",
-            "session_type": "study",
-        },
-        {
-            "day_of_week": 3,
-            "start_period": 1,
-            "end_period": 3,
-            "start_time": time(7, 0),
-            "end_time": time(9, 30),
-            "room": "C3.06",
-            "location": "Co so 2",
-            "session_type": "practice",
-        },
-        {
-            "day_of_week": 4,
-            "start_period": 7,
-            "end_period": 9,
-            "start_time": time(13, 0),
-            "end_time": time(15, 30),
-            "room": "Online",
-            "location": "Truc tuyen",
-            "session_type": "online",
-        },
-        {
-            "day_of_week": 5,
-            "start_period": 4,
-            "end_period": 6,
-            "start_time": time(9, 15),
-            "end_time": time(11, 45),
-            "room": "H6.02",
-            "location": "Co so 1",
-            "session_type": "study",
-        },
-        {
-            "day_of_week": 6,
-            "start_period": 1,
-            "end_period": 3,
-            "start_time": time(7, 0),
-            "end_time": time(9, 30),
-            "room": "Lab A2-2",
-            "location": "Co so 1",
-            "session_type": "practice",
-        },
-    ]
     if section.section_code in SAMPLE_TIMETABLE_BY_SECTION:
-        sample = SAMPLE_TIMETABLE_BY_SECTION[section.section_code].copy()
+        sample = normalize_timetable_shift_values(SAMPLE_TIMETABLE_BY_SECTION[section.section_code].copy())
         sample.setdefault("status", "published")
         sample.setdefault("weeks", "1-15")
+        sample.setdefault("source", "seed")
+        sample.setdefault("is_sample", True)
         return sample
+
+    fallback_by_slot = [
+        _build_shift_blueprint(day_of_week=1, shift_index=0, room="A1.01", location="Co so 1", session_type="study"),
+        _build_shift_blueprint(day_of_week=1, shift_index=1, room="A1.02", location="Co so 1", session_type="study"),
+        _build_shift_blueprint(day_of_week=2, shift_index=0, room="B2.01", location="Co so 1", session_type="practice"),
+        _build_shift_blueprint(day_of_week=2, shift_index=2, room="B2.04", location="Co so 1", session_type="study"),
+        _build_shift_blueprint(day_of_week=3, shift_index=0, room="C3.06", location="Co so 2", session_type="practice"),
+        _build_shift_blueprint(day_of_week=3, shift_index=2, room="C3.05", location="Co so 2", session_type="study"),
+        _build_shift_blueprint(day_of_week=4, shift_index=2, room="Online", location="Truc tuyen", session_type="online"),
+        _build_shift_blueprint(day_of_week=4, shift_index=3, room="B1.10", location="Co so 1", session_type="study"),
+        _build_shift_blueprint(day_of_week=5, shift_index=1, room="H6.02", location="Co so 1", session_type="study"),
+        _build_shift_blueprint(day_of_week=5, shift_index=3, room="H6.03", location="Co so 1", session_type="practice"),
+        _build_shift_blueprint(day_of_week=6, shift_index=0, room="Lab A2", location="Co so 1", session_type="practice"),
+        _build_shift_blueprint(day_of_week=6, shift_index=4, room="Lab A2-2", location="Co so 1", session_type="practice"),
+    ]
     generated = fallback_by_slot[index % len(fallback_by_slot)].copy()
     generated["room"] = generated["room"] if generated["room"] == "Online" else f"{generated['room']}-{(index % 3) + 1}"
     generated["weeks"] = "1-15"
     generated["status"] = "published"
+    generated["source"] = "seed"
+    generated["is_sample"] = True
     generated["note"] = f"Lich hoc demo cho {section.section_code}"
-    return generated
+    return normalize_timetable_shift_values(generated)
 
 
-def _blueprint_slot_key(blueprint: dict[str, Any]) -> tuple[int, str, str]:
-    start_value = blueprint.get("start_time")
-    end_value = blueprint.get("end_time")
-    start_key = start_value.strftime("%H:%M") if hasattr(start_value, "strftime") else str(start_value or "")
-    end_key = end_value.strftime("%H:%M") if hasattr(end_value, "strftime") else str(end_value or "")
-    return int(blueprint["day_of_week"]), start_key, end_key
+def _blueprint_slot_key(blueprint: dict[str, Any]) -> tuple[int, str]:
+    normalized = normalize_timetable_shift_values(blueprint)
+    return int(normalized["day_of_week"]), str(normalized["shift_code"])
 
 
 def _choose_non_conflicting_blueprint(
+    db: Session,
     *,
     section: CourseSection,
     index: int,
     linked_student_ids: list[str],
-    occupied_slots_by_student: dict[str, set[tuple[int, str, str]]],
-) -> dict[str, Any]:
-    fallback_count = 24
+    occupied_slots_by_student: dict[str, list[dict[str, Any]]],
+) -> tuple[dict[str, Any] | None, ScheduleConflict | None]:
+    fallback_count = 35
     primary = _build_generated_timetable_blueprint(section, index)
     candidates = [primary]
     for offset in range(1, fallback_count + 1):
         candidates.append(_build_generated_timetable_blueprint(section, index + offset))
 
+    last_conflict_detail: str | None = None
     for blueprint in candidates:
-        slot_key = _blueprint_slot_key(blueprint)
-        has_conflict = any(slot_key in occupied_slots_by_student.setdefault(student_id, set()) for student_id in linked_student_ids)
-        if not has_conflict:
-            for student_id in linked_student_ids:
-                occupied_slots_by_student.setdefault(student_id, set()).add(slot_key)
-            return blueprint
+        normalized = normalize_timetable_shift_values(blueprint)
+        day_of_week = int(normalized["day_of_week"])
+        start_time = normalized.get("start_time")
+        end_time = normalized.get("end_time")
+        has_conflict = False
+        for student_id in linked_student_ids:
+            for occupied in occupied_slots_by_student.setdefault(student_id, []):
+                if occupied["day_of_week"] != day_of_week:
+                    continue
+                if occupied["start_time"] is None or occupied["end_time"] is None:
+                    continue
 
-    chosen = candidates[0]
-    chosen_slot_key = _blueprint_slot_key(chosen)
-    for student_id in linked_student_ids:
-        occupied_slots_by_student.setdefault(student_id, set()).add(chosen_slot_key)
-    return chosen
+                if is_time_overlap(start_time, end_time, occupied["start_time"], occupied["end_time"]):
+                    has_conflict = True
+                    break
+            if has_conflict:
+                break
+        if not has_conflict:
+            values = {
+                "section_id": section.id,
+                "day_of_week": day_of_week,
+                "shift_code": normalized.get("shift_code"),
+                "shift_name": normalized.get("shift_name"),
+                "start_period": normalized.get("start_period"),
+                "end_period": normalized.get("end_period"),
+                "start_time": start_time,
+                "end_time": end_time,
+                "room": normalized.get("room"),
+                "weeks": normalized.get("weeks"),
+                "location": normalized.get("location"),
+                "valid_from": DEFAULT_TIMETABLE_VALID_FROM,
+                "valid_to": DEFAULT_TIMETABLE_VALID_TO,
+                "status": normalized.get("status", "published"),
+                "session_type": normalized.get("session_type", "study"),
+                "source": normalized.get("source", "seed"),
+                "is_sample": normalized.get("is_sample", True),
+                "note": normalized.get("note"),
+            }
+            try:
+                conflict = find_schedule_conflict(db, section=section, values=values)
+            except HTTPException as exc:
+                last_conflict_detail = str(exc.detail)
+                continue
+            if conflict is not None:
+                last_conflict_detail = conflict.detail
+                continue
+            for student_id in linked_student_ids:
+                occupied_slots_by_student.setdefault(student_id, []).append(
+                    {
+                        "day_of_week": day_of_week,
+                        "shift_code": normalized["shift_code"],
+                        "start_time": start_time,
+                        "end_time": end_time,
+                    }
+                )
+            return normalized, None
+
+    return None, ScheduleConflict(
+        reason="no_valid_non_conflicting_shift",
+        detail=(
+            f"term={section.term.term_code if section.term else '--'} "
+            f"section_code={section.section_code} course_code={section.course_code} "
+            f"course_name={section.course_name} teacher={section.teacher_external_id or '--'} "
+            f"reason=no valid non-conflicting shift found"
+            f"{f' last_conflict={last_conflict_detail}' if last_conflict_detail else ''}"
+        ),
+    )
 
 
 def _upsert_attendance_session(
@@ -747,6 +740,82 @@ def _get_course_source_items(
     return list(merged.values())
 
 
+def _list_resettable_sample_entries(
+    db: Session,
+    *,
+    term_id: UUID,
+) -> list[TimetableEntry]:
+    rows = db.scalars(
+        select(TimetableEntry)
+        .join(CourseSection, CourseSection.id == TimetableEntry.section_id)
+        .where(
+            CourseSection.term_id == term_id,
+            (
+                (TimetableEntry.is_sample.is_(True))
+                | (TimetableEntry.source.in_(["seed", "sample"]))
+                | (TimetableEntry.note.ilike("Lich hoc demo%"))
+            ),
+        )
+    ).all()
+    return list(rows)
+
+
+def cleanup_sample_schedules_for_term(
+    db: Session,
+    *,
+    term_id: UUID,
+    apply: bool = True,
+) -> tuple[int, list[str]]:
+    entries = _list_resettable_sample_entries(db, term_id=term_id)
+    entry_ids = [entry.id for entry in entries]
+    descriptions = [
+        f"{entry.section_id} thu={entry.day_of_week} shift={entry.shift_code or '--'} "
+        f"{entry.start_time or '--'}-{entry.end_time or '--'} room={entry.room or '--'}"
+        for entry in entries
+    ]
+    if apply:
+        if entry_ids:
+            sessions = db.scalars(
+                select(AttendanceSession).where(AttendanceSession.timetable_entry_id.in_(entry_ids))
+            ).all()
+            for session in sessions:
+                db.delete(session)
+        for entry in entries:
+            db.delete(entry)
+        db.flush()
+    return len(entries), descriptions
+
+
+def _normalize_import_timetable_values(
+    *,
+    section: CourseSection,
+    raw_values: dict[str, Any],
+    source: str,
+    is_sample: bool = False,
+) -> dict[str, Any]:
+    values = {
+        "section_id": section.id,
+        "day_of_week": int(raw_values["day_of_week"]),
+        "shift_code": raw_values.get("shift_code"),
+        "shift_name": raw_values.get("shift_name"),
+        "start_period": raw_values.get("start_period"),
+        "end_period": raw_values.get("end_period"),
+        "start_time": raw_values.get("start_time"),
+        "end_time": raw_values.get("end_time"),
+        "room": raw_values.get("room"),
+        "weeks": raw_values.get("weeks"),
+        "location": raw_values.get("location"),
+        "valid_from": raw_values.get("valid_from"),
+        "valid_to": raw_values.get("valid_to"),
+        "status": raw_values.get("status") or "published",
+        "session_type": raw_values.get("session_type") or "study",
+        "source": source,
+        "is_sample": is_sample,
+        "note": raw_values.get("note"),
+    }
+    return normalize_timetable_shift_values(values)
+
+
 def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCoreResponse:
     client = CoreApiClient()
     term_name = str(payload.get("term") or "HK2 (2025 - 2026)").strip()
@@ -764,6 +833,10 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
         term, created_term = _upsert_term(db, term_code=term_code, term_name=term_name)
         if created_term:
             counters.imported_terms += 1
+        if create_sample_timetable:
+            removed_count, _ = cleanup_sample_schedules_for_term(db, term_id=term.id, apply=True)
+            if removed_count:
+                errors.append(f"Removed {removed_count} existing sample timetable entries before reseeding term {term.term_code}.")
 
         student_profiles: dict[str, dict[str, Any]] = {}
         for student_id in requested_student_ids:
@@ -818,12 +891,11 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
 
         section_lookup: dict[str, CourseSection] = {}
         timetable_lookup: dict[str, TimetableEntry] = {}
-        occupied_slots_by_student: dict[str, set[tuple[int, str, str]]] = {}
+        occupied_slots_by_student: dict[str, list[dict[str, Any]]] = {}
         for item in source_items:
             sc = str(item.get("section_code") or "").strip()
             if sc in SAMPLE_TIMETABLE_BY_SECTION:
-                blueprint = SAMPLE_TIMETABLE_BY_SECTION[sc]
-                slot_key = _blueprint_slot_key(blueprint)
+                blueprint = normalize_timetable_shift_values(SAMPLE_TIMETABLE_BY_SECTION[sc])
                 l_ids = _extract_ids(item.get("student_ids") or [])
                 if requested_student_ids:
                     r_set = set(student_profiles.keys()) or set(requested_student_ids)
@@ -831,7 +903,14 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
                     if not l_ids:
                         l_ids = [student_id for student_id in student_profiles.keys()]
                 for student_id in l_ids:
-                    occupied_slots_by_student.setdefault(student_id, set()).add(slot_key)
+                    occupied_slots_by_student.setdefault(student_id, []).append(
+                        {
+                            "day_of_week": int(blueprint["day_of_week"]),
+                            "shift_code": blueprint.get("shift_code"),
+                            "start_time": blueprint.get("start_time"),
+                            "end_time": blueprint.get("end_time"),
+                        }
+                    )
 
         preferred_faculty = next(
             (profile.get("faculty") for profile in student_profiles.values() if profile.get("faculty")),
@@ -907,12 +986,21 @@ def import_seed_from_core(db: Session, payload: dict[str, Any]) -> ImportFromCor
                 if created_link:
                     counters.linked_students += 1
             if create_sample_timetable:
-                blueprint = _choose_non_conflicting_blueprint(
+                blueprint, conflict = _choose_non_conflicting_blueprint(
+                    db,
                     section=section,
                     index=item_index,
                     linked_student_ids=linked_ids,
                     occupied_slots_by_student=occupied_slots_by_student,
                 )
+                if blueprint is None:
+                    warnings_message = conflict.detail if conflict else (
+                        f"term={term_code} section_code={section.section_code} course_code={section.course_code} "
+                        f"course_name={section.course_name} teacher={section.teacher_external_id or '--'} "
+                        "reason=no valid non-conflicting shift found"
+                    )
+                    errors.append(warnings_message)
+                    continue
                 entry, created_entry = _upsert_timetable_entry(
                     db,
                     section_id=section.id,
@@ -1113,6 +1201,8 @@ def get_import_debug_summary(
                 CourseSection.course_code,
                 CourseSection.course_name,
                 TimetableEntry.day_of_week,
+                TimetableEntry.shift_code,
+                TimetableEntry.shift_name,
                 TimetableEntry.start_time,
                 TimetableEntry.end_time,
                 TimetableEntry.room,
@@ -1174,6 +1264,8 @@ def get_import_debug_summary(
                 course_code=row.course_code,
                 course_name=row.course_name,
                 day_of_week=int(row.day_of_week),
+                shift_code=row.shift_code,
+                shift_name=row.shift_name,
                 start_time=row.start_time,
                 end_time=row.end_time,
                 room=row.room,
@@ -1240,21 +1332,21 @@ def _upsert_timetable_entry_for_section(
     section: CourseSection,
     values: dict[str, Any],
 ) -> str:
+    normalized_values = normalize_timetable_shift_values(values)
     existing = db.scalar(
         select(TimetableEntry).where(
             TimetableEntry.section_id == section.id,
-            TimetableEntry.day_of_week == values["day_of_week"],
-            TimetableEntry.start_time == values.get("start_time"),
-            TimetableEntry.end_time == values.get("end_time"),
-            TimetableEntry.room == values.get("room"),
+            TimetableEntry.day_of_week == normalized_values["day_of_week"],
+            TimetableEntry.shift_code == normalized_values.get("shift_code"),
+            TimetableEntry.room == normalized_values.get("room"),
         )
     )
-    _validate_timetable_entry_write(db, section=section, values=values, existing=existing)
+    normalized_values = _validate_timetable_entry_write(db, section=section, values=normalized_values, existing=existing)
     if existing is None:
-        timetable_repo.create_timetable_entry(db, values)
+        timetable_repo.create_timetable_entry(db, normalized_values)
         return "created"
 
-    timetable_repo.update_timetable_entry(db, existing, values)
+    timetable_repo.update_timetable_entry(db, existing, normalized_values)
     return "updated"
 
 
@@ -1287,45 +1379,31 @@ def import_timetable_entries_from_payload(db: Session, payload: dict[str, Any]) 
                 warnings.append(f"Entry #{index} skipped because section_code '{section_code}' was not found in term {term_code}.")
                 continue
 
-            start_time = entry.get("start_time")
-            end_time = entry.get("end_time")
-            room = entry.get("room")
-            day_of_week = int(entry["day_of_week"])
-
-            existing = db.scalar(
-                select(TimetableEntry).where(
-                    TimetableEntry.section_id == section.id,
-                    TimetableEntry.day_of_week == day_of_week,
-                    TimetableEntry.start_time == start_time,
-                    TimetableEntry.end_time == end_time,
-                    TimetableEntry.room == room,
+            try:
+                values = _normalize_import_timetable_values(
+                    section=section,
+                    raw_values=entry,
+                    source="admin_import",
                 )
-            )
+                existing = db.scalar(
+                    select(TimetableEntry).where(
+                        TimetableEntry.section_id == section.id,
+                        TimetableEntry.day_of_week == values["day_of_week"],
+                        TimetableEntry.shift_code == values.get("shift_code"),
+                        TimetableEntry.room == values.get("room"),
+                    )
+                )
 
-            values = {
-                "section_id": section.id,
-                "day_of_week": day_of_week,
-                "start_period": entry.get("start_period"),
-                "end_period": entry.get("end_period"),
-                "start_time": start_time,
-                "end_time": end_time,
-                "room": room,
-                "weeks": entry.get("weeks"),
-                "location": entry.get("location"),
-                "valid_from": entry.get("valid_from"),
-                "valid_to": entry.get("valid_to"),
-                "status": entry.get("status") or "published",
-                "session_type": entry.get("session_type") or "study",
-                "note": entry.get("note"),
-            }
-
-            _validate_timetable_entry_write(db, section=section, values=values, existing=existing)
-            if existing is None:
-                timetable_repo.create_timetable_entry(db, values)
-                created += 1
-            else:
-                timetable_repo.update_timetable_entry(db, existing, values)
-                updated += 1
+                values = _validate_timetable_entry_write(db, section=section, values=values, existing=existing)
+                if existing is None:
+                    timetable_repo.create_timetable_entry(db, values)
+                    created += 1
+                else:
+                    timetable_repo.update_timetable_entry(db, existing, values)
+                    updated += 1
+            except HTTPException as exc:
+                skipped += 1
+                warnings.append(f"Entry #{index} skipped: {exc.detail}")
 
         db.commit()
     except Exception:
@@ -1394,13 +1472,12 @@ def import_timetable_entries_from_csv(
                 if day_of_week is None:
                     raise ValueError("Missing day_of_week")
 
+                shift_code = _normalize_csv_value(row.get("shift_code"))
                 start_time = _parse_csv_time(row.get("start_time"), row_number=row_number, field_name="start_time", section_code=section_code)
                 end_time = _parse_csv_time(row.get("end_time"), row_number=row_number, field_name="end_time", section_code=section_code)
-                if start_time is None:
-                    raise ValueError("Missing start_time")
-                if end_time is None:
-                    raise ValueError("Missing end_time")
-                if end_time <= start_time:
+                if shift_code is None and (start_time is None or end_time is None):
+                    raise ValueError("Missing shift_code or start_time/end_time")
+                if start_time is not None and end_time is not None and end_time <= start_time:
                     raise ValueError("end_time must be greater than start_time")
 
                 start_period = _parse_csv_int(row.get("start_period"), row_number=row_number, field_name="start_period", minimum=1)
@@ -1423,35 +1500,40 @@ def import_timetable_entries_from_csv(
                     )
                     continue
 
-                values = {
-                    "section_id": section.id,
-                    "day_of_week": day_of_week,
-                    "start_period": start_period,
-                    "end_period": end_period,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "room": _normalize_csv_value(row.get("room")),
-                    "weeks": _normalize_csv_value(row.get("weeks")),
-                    "location": _normalize_csv_value(row.get("location")) or _normalize_csv_value(row.get("building")),
-                    "valid_from": None,
-                    "valid_to": None,
-                    "status": _normalize_csv_value(row.get("status")) or "published",
-                    "session_type": _normalize_csv_value(row.get("session_type")) or _normalize_csv_value(row.get("lesson_type")) or "study",
-                    "note": _normalize_csv_value(row.get("note")),
-                }
+                values = _normalize_import_timetable_values(
+                    section=section,
+                    raw_values={
+                        "day_of_week": day_of_week,
+                        "shift_code": shift_code,
+                        "start_period": start_period,
+                        "end_period": end_period,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "room": _normalize_csv_value(row.get("room")),
+                        "weeks": _normalize_csv_value(row.get("weeks")),
+                        "location": _normalize_csv_value(row.get("location")) or _normalize_csv_value(row.get("building")),
+                        "valid_from": None,
+                        "valid_to": None,
+                        "status": _normalize_csv_value(row.get("status")) or "published",
+                        "session_type": _normalize_csv_value(row.get("session_type")) or _normalize_csv_value(row.get("lesson_type")) or "study",
+                        "note": _normalize_csv_value(row.get("note")),
+                    },
+                    source="admin_import_csv",
+                )
 
                 result = _upsert_timetable_entry_for_section(db, section=section, values=values)
                 if result == "created":
                     created += 1
                 else:
                     updated += 1
-            except ValueError as exc:
+            except (ValueError, HTTPException) as exc:
                 skipped += 1
+                error_message = exc.detail if isinstance(exc, HTTPException) else str(exc)
                 invalid_rows.append(
                     TimetableCsvInvalidRow(
                         row=row_number,
                         section_code=section_code,
-                        error=str(exc),
+                        error=str(error_message),
                     )
                 )
 
@@ -1502,6 +1584,7 @@ def build_timetable_entries_csv_scaffold(
         "teacher_external_id",
         "student_count",
         "day_of_week",
+        "shift_code",
         "start_time",
         "end_time",
         "room",

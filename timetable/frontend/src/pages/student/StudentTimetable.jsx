@@ -5,16 +5,23 @@ import { ErrorState, LoadingState } from "../../components/DataState";
 import { fetchStudentExams, fetchStudentTimetable } from "../../services/studentApi";
 
 const DAY_LABELS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
-const DAY_START = "07:00";
+const DAY_START = "06:30";
 const DAY_END = "21:30";
 const PIXELS_PER_HOUR = 80;
-const TIME_GUIDES = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
+const TIME_GUIDES = ["06:30", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "12:30", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
 const LEGEND_ITEMS = [
   { key: "study", label: "Lý thuyết", className: "type-study" },
   { key: "practice", label: "Thực hành", className: "type-practice" },
   { key: "online", label: "Trực tuyến", className: "type-online" },
   { key: "exam", label: "Lịch thi", className: "type-exam" },
   { key: "cancelled", label: "Tạm ngưng", className: "type-cancelled" },
+];
+const SHIFT_OPTIONS = [
+  { shift_code: "CA1", shift_name: "Ca 1", start_time: "06:30", end_time: "09:00" },
+  { shift_code: "CA2", shift_name: "Ca 2", start_time: "09:10", end_time: "11:40" },
+  { shift_code: "CA3", shift_name: "Ca 3", start_time: "12:30", end_time: "15:00" },
+  { shift_code: "CA4", shift_name: "Ca 4", start_time: "15:10", end_time: "17:40" },
+  { shift_code: "CA5", shift_name: "Ca 5", start_time: "18:00", end_time: "20:40" },
 ];
 
 function parseDate(value) {
@@ -62,6 +69,25 @@ function formatTimeRange(start, end) {
   const normalizedStart = start ? String(start).slice(0, 5) : "--";
   const normalizedEnd = end ? String(end).slice(0, 5) : "--";
   return `${normalizedStart} - ${normalizedEnd}`;
+}
+
+function resolveShift(item) {
+  if (item.shift_code) {
+    return SHIFT_OPTIONS.find((shift) => shift.shift_code === item.shift_code) || null;
+  }
+  return (
+    SHIFT_OPTIONS.find(
+      (shift) =>
+        shift.start_time === String(item.start_time || "").slice(0, 5)
+        && shift.end_time === String(item.end_time || "").slice(0, 5),
+    ) || null
+  );
+}
+
+function formatShiftTimeRange(item) {
+  const shift = resolveShift(item);
+  const shiftLabel = item.shift_name || shift?.shift_name || item.shift_code || "--";
+  return `${shiftLabel} • ${formatTimeRange(item.start_time, item.end_time)}`;
 }
 
 function timeToMinutes(value) {
@@ -133,8 +159,7 @@ function computeOverlapLayout(events) {
 
   for (const event of positioned) {
     for (let index = active.length - 1; index >= 0; index -= 1) {
-      // Tolerate minor nominal overlaps (up to 20 mins) between consecutive periods
-      if (active[index].endMinutes <= event.startMinutes + 20) {
+      if (active[index].endMinutes <= event.startMinutes) {
         active.splice(index, 1);
       }
     }
@@ -254,7 +279,7 @@ export default function StudentTimetable() {
           <div className="eyebrow">Lịch tuần theo thời gian thực</div>
           <h2 className="page-title">Thời khóa biểu sinh viên</h2>
           <p className="page-subtitle">
-            Lịch được hiển thị theo timeline thật từ 07:00 đến 21:30, block môn học nằm đúng giờ bắt đầu và kết thúc như lịch portal đại học.
+            Lịch được hiển thị theo timeline thật từ 06:30 đến 21:30, block môn học nằm đúng giờ bắt đầu và kết thúc như lịch portal đại học.
           </p>
         </div>
         <div className="hero-note">
@@ -354,7 +379,7 @@ export default function StudentTimetable() {
                       onClick={() => setSelectedItem(item)}
                     >
                       <div className="timeline-event-title">{item.course_name}</div>
-                      <div className="timeline-event-meta">{formatTimeRange(item.start_time, item.end_time)}</div>
+                      <div className="timeline-event-meta">{formatShiftTimeRange(item)}</div>
                       {(item.room || item.location) ? <div className="timeline-event-meta timeline-event-meta-wrap">{item.room || item.location}</div> : null}
                       {item.teacher_name || item.teacher_external_id ? (
                         <div className="timeline-event-meta timeline-event-meta-wrap">{item.teacher_name || item.teacher_external_id}</div>
@@ -376,7 +401,7 @@ export default function StudentTimetable() {
                         </div>
                         <div className="schedule-tooltip-row">
                           <span>Thời gian</span>
-                          <strong>{formatTimeRange(item.start_time, item.end_time)}</strong>
+                          <strong>{formatShiftTimeRange(item)}</strong>
                         </div>
                         <div className="schedule-tooltip-row">
                           <span>Loại lịch</span>
@@ -426,6 +451,7 @@ export default function StudentTimetable() {
               <div><strong>Mã lớp học phần</strong><div>{selectedItem.section_code || "--"}</div></div>
               <div><strong>Giảng viên</strong><div>{selectedItem.teacher_name || selectedItem.teacher_external_id || "--"}</div></div>
               <div><strong>Phòng</strong><div>{selectedItem.room || selectedItem.location || "--"}</div></div>
+              <div><strong>Ca học</strong><div>{selectedItem.shift_name || resolveShift(selectedItem)?.shift_name || selectedItem.shift_code || "--"}</div></div>
               <div><strong>Thời gian</strong><div>{formatTimeRange(selectedItem.start_time, selectedItem.end_time)}</div></div>
               <div><strong>Loại lịch</strong><div>{formatSessionType(selectedItem)}</div></div>
             </div>
