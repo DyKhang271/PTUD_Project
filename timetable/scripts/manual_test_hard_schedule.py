@@ -50,10 +50,7 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_timetable_payload(room: str, campus: str = "Co so 1") -> dict:
     return {
         "day_of_week": 2,
-        "start_period": 1,
-        "end_period": 3,
-        "start_time": "07:00:00",
-        "end_time": "09:30:00",
+        "shift_code": "CA1",
         "room": room,
         "campus": campus,
         "effective_from": "2026-02-01",

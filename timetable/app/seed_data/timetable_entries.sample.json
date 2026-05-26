@@ -4,8 +4,9 @@
     {
       "section_code": "REPLACE_WITH_REAL_SECTION_CODE",
       "day_of_week": 2,
-      "start_time": "07:00",
-      "end_time": "09:30",
+      "shift_code": "CA1",
+      "start_time": "06:30",
+      "end_time": "09:00",
       "room": "A1.01",
       "weeks": "1-15",
       "status": "published"

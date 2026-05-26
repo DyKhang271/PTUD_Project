@@ -12,6 +12,8 @@ class TimetableEntryBase(BaseModel):
     day_of_week: int = Field(ge=1, le=7)
     start_period: int | None = None
     end_period: int | None = None
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
@@ -21,6 +23,8 @@ class TimetableEntryBase(BaseModel):
     valid_to: DateType | None = None
     status: str = "published"
     session_type: str = "study"
+    source: str = "manual"
+    is_sample: bool = False
     note: str | None = None
 
     @model_validator(mode="after")
@@ -43,6 +47,8 @@ class TimetableEntryUpdate(BaseModel):
     day_of_week: int | None = Field(default=None, ge=1, le=7)
     start_period: int | None = None
     end_period: int | None = None
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
@@ -52,6 +58,8 @@ class TimetableEntryUpdate(BaseModel):
     valid_to: DateType | None = None
     status: str | None = None
     session_type: str | None = None
+    source: str | None = None
+    is_sample: bool | None = None
     note: str | None = None
 
     @model_validator(mode="after")
@@ -85,6 +93,8 @@ class StudentTimetableItem(BaseModel):
     date: DateType | None = None
     start_period: int | None = None
     end_period: int | None = None
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
@@ -109,6 +119,8 @@ class TeacherTimetableItem(BaseModel):
     day_of_week: int
     start_period: int | None = None
     end_period: int | None = None
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
@@ -136,6 +148,8 @@ class AdminTimetableEntryRead(BaseModel):
     day_of_week: int
     start_period: int | None = None
     end_period: int | None = None
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
@@ -143,6 +157,8 @@ class AdminTimetableEntryRead(BaseModel):
     location: str | None = None
     status: str = "published"
     session_type: str = "study"
+    source: str = "manual"
+    is_sample: bool = False
     note: str | None = None
     valid_from: DateType | None = None
     valid_to: DateType | None = None
@@ -245,8 +261,10 @@ class AdminExamCourseGroupRead(BaseModel):
 
 class SectionTimetableWriteBase(BaseModel):
     day_of_week: int = Field(ge=1, le=7)
-    start_period: int = Field(ge=1)
-    end_period: int = Field(ge=1)
+    start_period: int | None = Field(default=None, ge=1)
+    end_period: int | None = Field(default=None, ge=1)
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
@@ -265,7 +283,7 @@ class SectionTimetableWriteBase(BaseModel):
     def validate_period_range(self):
         range_start = self.valid_from or self.effective_from
         range_end = self.valid_to or self.effective_to
-        if self.end_period < self.start_period:
+        if self.start_period is not None and self.end_period is not None and self.end_period < self.start_period:
             raise ValueError("end_period must be greater than or equal to start_period")
         if self.start_time and self.end_time and self.end_time <= self.start_time:
             raise ValueError("end_time must be greater than start_time")
@@ -282,6 +300,8 @@ class SectionTimetableUpdate(BaseModel):
     day_of_week: int | None = Field(default=None, ge=1, le=7)
     start_period: int | None = Field(default=None, ge=1)
     end_period: int | None = Field(default=None, ge=1)
+    shift_code: str | None = None
+    shift_name: str | None = None
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None

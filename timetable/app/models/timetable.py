@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, time
 from uuid import UUID, uuid4
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, SmallInteger, Text, Time, func
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, SmallInteger, Text, Time, func
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -25,6 +25,8 @@ class TimetableEntry(Base):
     day_of_week: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     start_period: Mapped[int | None] = mapped_column(SmallInteger)
     end_period: Mapped[int | None] = mapped_column(SmallInteger)
+    shift_code: Mapped[str | None] = mapped_column(Text)
+    shift_name: Mapped[str | None] = mapped_column(Text)
     start_time: Mapped[time | None] = mapped_column(Time)
     end_time: Mapped[time | None] = mapped_column(Time)
     room: Mapped[str | None] = mapped_column(Text)
@@ -34,6 +36,8 @@ class TimetableEntry(Base):
     valid_to: Mapped[date | None] = mapped_column(Date)
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="published")
     session_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="study")
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default="manual")
+    is_sample: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

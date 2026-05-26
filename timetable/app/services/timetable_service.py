@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, time, timedelta
 import logging
 from uuid import UUID
@@ -9,6 +10,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.schedule_shifts import (
+    STANDARD_SCHEDULE_SHIFTS,
+    ScheduleShift,
+    get_shift_by_code,
+    get_shift_by_time_range,
+)
 from app.models.course_section import CourseSection, CourseSectionStudent
 from app.models.scheduling_constraints import Room, SectionSchedulingRequirement, TeacherAvailability
 from app.models.timetable import ExamSchedule, TimetableEntry
@@ -28,6 +35,67 @@ from app.services.section_service import assign_teacher, get_section_or_404
 
 VISIBLE_TIMETABLE_STATUSES = {"published"}
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ScheduleConflict:
+    reason: str
+    detail: str
+    entry: TimetableEntry | None = None
+    section: CourseSection | None = None
+
+
+def list_standard_schedule_shifts() -> list[dict[str, str]]:
+    return [
+        {
+            "shift_code": shift.shift_code,
+            "shift_name": shift.shift_name,
+            "start_time": shift.start_time.strftime("%H:%M"),
+            "end_time": shift.end_time.strftime("%H:%M"),
+        }
+        for shift in STANDARD_SCHEDULE_SHIFTS
+    ]
+
+
+def resolve_standard_shift(
+    *,
+    shift_code: str | None = None,
+    start_time: time | None = None,
+    end_time: time | None = None,
+) -> ScheduleShift | None:
+    if shift_code:
+        return get_shift_by_code(shift_code)
+    if start_time is not None and end_time is not None:
+        return get_shift_by_time_range(start_time, end_time)
+    return None
+
+
+def normalize_timetable_shift_values(
+    values: dict,
+    *,
+    require_shift: bool = True,
+) -> dict:
+    normalized = dict(values)
+    shift = resolve_standard_shift(
+        shift_code=normalized.get("shift_code"),
+        start_time=normalized.get("start_time"),
+        end_time=normalized.get("end_time"),
+    )
+    if shift is None:
+        if require_shift:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Lịch học phải thuộc một trong 5 ca học chuẩn của hệ thống.",
+            )
+        return normalized
+
+    normalized["shift_code"] = shift.shift_code
+    normalized["shift_name"] = shift.shift_name
+    normalized["start_time"] = shift.start_time
+    normalized["end_time"] = shift.end_time
+    normalized["start_period"] = shift.start_period
+    normalized["end_period"] = shift.end_period
+    return normalized
 
 
 def _dates_matching_day(date_from: date, date_to: date, day_of_week: int) -> list[date]:
@@ -133,10 +201,30 @@ def _build_timetable_overlap_detail(entry: TimetableEntry, section: CourseSectio
     )
 
 
+def _build_schedule_conflict_detail(*, prefix: str, entry: TimetableEntry, section: CourseSection) -> str:
+    room = (entry.room or "--").strip()
+    teacher = (section.teacher_external_id or "--").strip()
+    return (
+        f"{prefix}: {section.course_name} ({section.section_code}) "
+        f"từ {_format_time(entry.start_time)} đến {_format_time(entry.end_time)} "
+        f"• phòng {room} • giảng viên {teacher}"
+    )
+
+
 def _timetable_entry_has_invalid_time_range(entry: TimetableEntry) -> bool:
     if entry.start_time is None or entry.end_time is None:
         return False
     return entry.end_time <= entry.start_time
+
+
+def _entry_uses_non_standard_shift(entry: TimetableEntry) -> bool:
+    if entry.start_time is None or entry.end_time is None:
+        return True
+    return resolve_standard_shift(
+        shift_code=entry.shift_code,
+        start_time=entry.start_time,
+        end_time=entry.end_time,
+    ) is None
 
 
 def _entry_is_outside_term(entry: TimetableEntry, section: CourseSection) -> bool:
@@ -188,6 +276,14 @@ def _detect_invalid_timetable_issues(
                 section=section,
                 reason="invalid_time_range",
                 detail="Giờ kết thúc phải lớn hơn giờ bắt đầu.",
+            )
+            continue
+        if _entry_uses_non_standard_shift(entry):
+            issues_by_id[entry.id] = _build_invalid_issue(
+                entry=entry,
+                section=section,
+                reason="invalid_shift",
+                detail="Lịch học không khớp 1 trong 5 ca học chuẩn.",
             )
             continue
         if _entry_is_outside_term(entry, section):
@@ -335,6 +431,8 @@ def _build_student_item(
         date=resolved_date,
         start_period=entry.start_period,
         end_period=entry.end_period,
+        shift_code=entry.shift_code,
+        shift_name=entry.shift_name,
         start_time=entry.start_time,
         end_time=entry.end_time,
         room=entry.room,
@@ -361,6 +459,8 @@ def _build_teacher_item(entry: TimetableEntry, section: CourseSection, student_c
         day_of_week=entry.day_of_week,
         start_period=entry.start_period,
         end_period=entry.end_period,
+        shift_code=entry.shift_code,
+        shift_name=entry.shift_name,
         start_time=entry.start_time,
         end_time=entry.end_time,
         room=entry.room,
@@ -814,26 +914,27 @@ def _validate_constraint_foundation(db: Session, *, section: CourseSection, valu
             )
 
 
-def _validate_conflicts(
+def find_schedule_conflict(
     db: Session,
     *,
     section: CourseSection,
     values: dict,
     exclude_entry_id: UUID | None = None,
-) -> None:
-    _validate_timetable_term_date_range(section=section, values=values)
-    start_period = values.get("start_period")
-    end_period = values.get("end_period")
-    start_time = values.get("start_time")
-    end_time = values.get("end_time")
+) -> ScheduleConflict | None:
+    normalized_values = normalize_timetable_shift_values(values)
+    _validate_timetable_term_date_range(section=section, values=normalized_values)
+    start_period = normalized_values.get("start_period")
+    end_period = normalized_values.get("end_period")
+    start_time = normalized_values.get("start_time")
+    end_time = normalized_values.get("end_time")
     has_period_range = start_period is not None and end_period is not None
     has_time_range = start_time is not None and end_time is not None
     if not has_period_range and not has_time_range:
-        return
+        return None
 
-    day_of_week = values["day_of_week"]
-    valid_from = values.get("valid_from")
-    valid_to = values.get("valid_to")
+    day_of_week = normalized_values["day_of_week"]
+    valid_from = normalized_values.get("valid_from")
+    valid_to = normalized_values.get("valid_to")
     section_conflict = _check_section_conflict(
         db,
         section=section,
@@ -847,9 +948,15 @@ def _validate_conflicts(
         exclude_entry_id=exclude_entry_id,
     )
     if section_conflict:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_build_timetable_overlap_detail(section_conflict, section),
+        return ScheduleConflict(
+            reason="section_conflict",
+            detail=_build_schedule_conflict_detail(
+                prefix="Trùng lịch cùng lớp học phần",
+                entry=section_conflict,
+                section=section,
+            ),
+            entry=section_conflict,
+            section=section,
         )
 
     teacher_conflict = check_teacher_conflict(
@@ -866,16 +973,22 @@ def _validate_conflicts(
     )
     if teacher_conflict:
         conflict_entry, conflict_section = teacher_conflict
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_build_timetable_overlap_detail(conflict_entry, conflict_section),
+        return ScheduleConflict(
+            reason="teacher_conflict",
+            detail=_build_schedule_conflict_detail(
+                prefix="Trùng lịch giảng viên",
+                entry=conflict_entry,
+                section=conflict_section,
+            ),
+            entry=conflict_entry,
+            section=conflict_section,
         )
 
     room_conflict = check_room_conflict(
         db,
         section=section,
-        room=values.get("room"),
-        campus=values.get("location"),
+        room=normalized_values.get("room"),
+        campus=normalized_values.get("location"),
         day_of_week=day_of_week,
         start_period=start_period,
         end_period=end_period,
@@ -887,9 +1000,15 @@ def _validate_conflicts(
     )
     if room_conflict:
         conflict_entry, conflict_section = room_conflict
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_build_timetable_overlap_detail(conflict_entry, conflict_section),
+        return ScheduleConflict(
+            reason="room_conflict",
+            detail=_build_schedule_conflict_detail(
+                prefix="Trùng lịch phòng học",
+                entry=conflict_entry,
+                section=conflict_section,
+            ),
+            entry=conflict_entry,
+            section=conflict_section,
         )
 
     conflicting_section, conflicting_entry, conflict_count = check_student_conflict(
@@ -905,18 +1024,61 @@ def _validate_conflicts(
         exclude_entry_id=exclude_entry_id,
     )
     if conflicting_section and conflicting_entry and conflict_count:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=_build_timetable_overlap_detail(conflicting_entry, conflicting_section),
+        return ScheduleConflict(
+            reason="student_conflict",
+            detail=_build_schedule_conflict_detail(
+                prefix=f"Trùng lịch nhóm sinh viên ({conflict_count} SV)",
+                entry=conflicting_entry,
+                section=conflicting_section,
+            ),
+            entry=conflicting_entry,
+            section=conflicting_section,
         )
 
-    _validate_constraint_foundation(db, section=section, values=values)
+    _validate_constraint_foundation(db, section=section, values=normalized_values)
+    return None
+
+
+def assert_no_schedule_conflict(
+    db: Session,
+    *,
+    section: CourseSection,
+    values: dict,
+    exclude_entry_id: UUID | None = None,
+) -> dict:
+    normalized_values = normalize_timetable_shift_values(values)
+    conflict = find_schedule_conflict(
+        db,
+        section=section,
+        values=normalized_values,
+        exclude_entry_id=exclude_entry_id,
+    )
+    if conflict:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=conflict.detail)
+    return normalized_values
+
+
+def _validate_conflicts(
+    db: Session,
+    *,
+    section: CourseSection,
+    values: dict,
+    exclude_entry_id: UUID | None = None,
+) -> dict:
+    return assert_no_schedule_conflict(
+        db,
+        section=section,
+        values=values,
+        exclude_entry_id=exclude_entry_id,
+    )
 
 
 def create_timetable_entry(db: Session, values: dict):
     section = get_section_or_404(db, values["section_id"])
-    _validate_conflicts(db, section=section, values=values)
-    entry = timetable_repo.create_timetable_entry(db, values)
+    normalized_values = _validate_conflicts(db, section=section, values=values)
+    normalized_values.setdefault("source", "manual")
+    normalized_values.setdefault("is_sample", False)
+    entry = timetable_repo.create_timetable_entry(db, normalized_values)
     db.commit()
     return entry
 
@@ -927,8 +1089,10 @@ def create_section_timetable_entry(db: Session, *, section_id: UUID, values: dic
     mapped_values = {
         "section_id": section.id,
         "day_of_week": values["day_of_week"],
-        "start_period": values["start_period"],
-        "end_period": values["end_period"],
+        "start_period": values.get("start_period"),
+        "end_period": values.get("end_period"),
+        "shift_code": values.get("shift_code"),
+        "shift_name": values.get("shift_name"),
         "start_time": values.get("start_time"),
         "end_time": values.get("end_time"),
         "room": values.get("room"),
@@ -938,10 +1102,12 @@ def create_section_timetable_entry(db: Session, *, section_id: UUID, values: dic
         "valid_to": values.get("valid_to") or values.get("effective_to"),
         "status": values.get("status", "published"),
         "session_type": values.get("session_type", "study"),
+        "source": values.get("source", "manual"),
+        "is_sample": values.get("is_sample", False),
         "note": values.get("note"),
     }
-    _validate_conflicts(db, section=section, values=mapped_values)
-    entry = timetable_repo.create_timetable_entry(db, mapped_values)
+    normalized_values = _validate_conflicts(db, section=section, values=mapped_values)
+    entry = timetable_repo.create_timetable_entry(db, normalized_values)
     db.commit()
     return entry
 
@@ -961,6 +1127,8 @@ def update_timetable_entry(db: Session, entry_id: UUID, values: dict):
         "day_of_week": values.get("day_of_week", entry.day_of_week),
         "start_period": values.get("start_period", entry.start_period),
         "end_period": values.get("end_period", entry.end_period),
+        "shift_code": values.get("shift_code", entry.shift_code),
+        "shift_name": values.get("shift_name", entry.shift_name),
         "start_time": values.get("start_time", entry.start_time),
         "end_time": values.get("end_time", entry.end_time),
         "room": values.get("room", entry.room),
@@ -970,10 +1138,12 @@ def update_timetable_entry(db: Session, entry_id: UUID, values: dict):
         "valid_to": values.get("valid_to", entry.valid_to),
         "status": values.get("status", entry.status),
         "session_type": values.get("session_type", entry.session_type),
+        "source": values.get("source", entry.source),
+        "is_sample": values.get("is_sample", entry.is_sample),
         "note": values.get("note", entry.note),
     }
-    _validate_conflicts(db, section=section, values=merged_values, exclude_entry_id=entry.id)
-    updated = timetable_repo.update_timetable_entry(db, entry, merged_values)
+    normalized_values = _validate_conflicts(db, section=section, values=merged_values, exclude_entry_id=entry.id)
+    updated = timetable_repo.update_timetable_entry(db, entry, normalized_values)
     db.commit()
     return updated
 
@@ -983,6 +1153,8 @@ def update_section_timetable_entry(db: Session, *, entry_id: UUID, values: dict)
         "day_of_week": values.get("day_of_week"),
         "start_period": values.get("start_period"),
         "end_period": values.get("end_period"),
+        "shift_code": values.get("shift_code"),
+        "shift_name": values.get("shift_name"),
         "start_time": values.get("start_time"),
         "end_time": values.get("end_time"),
         "room": values.get("room"),
@@ -1140,6 +1312,8 @@ def list_admin_timetable_entries(
             day_of_week=entry.day_of_week,
             start_period=entry.start_period,
             end_period=entry.end_period,
+            shift_code=entry.shift_code,
+            shift_name=entry.shift_name,
             start_time=entry.start_time,
             end_time=entry.end_time,
             room=entry.room,
@@ -1147,6 +1321,8 @@ def list_admin_timetable_entries(
             location=entry.location,
             status=entry.status,
             session_type=entry.session_type,
+            source=entry.source,
+            is_sample=entry.is_sample,
             note=entry.note,
             valid_from=entry.valid_from,
             valid_to=entry.valid_to,

@@ -48,9 +48,17 @@ const EXAM_TYPE_OPTIONS = [
 ];
 
 const SESSION_TYPE_OPTIONS = [
-  { value: "theory", label: "Lý thuyết" },
-  { value: "practical", label: "Thực hành" },
+  { value: "study", label: "Lý thuyết" },
+  { value: "practice", label: "Thực hành" },
   { value: "online", label: "Trực tuyến" },
+];
+
+const SHIFT_OPTIONS = [
+  { value: "CA1", label: "Ca 1", start_time: "06:30", end_time: "09:00" },
+  { value: "CA2", label: "Ca 2", start_time: "09:10", end_time: "11:40" },
+  { value: "CA3", label: "Ca 3", start_time: "12:30", end_time: "15:00" },
+  { value: "CA4", label: "Ca 4", start_time: "15:10", end_time: "17:40" },
+  { value: "CA5", label: "Ca 5", start_time: "18:00", end_time: "20:40" },
 ];
 
 const initialFilters = {
@@ -72,6 +80,7 @@ const initialTimetableForm = {
   course_id: "",
   section_id: "",
   day_of_week: "2",
+  shift_code: "",
   start_time: "",
   end_time: "",
   valid_from: "",
@@ -79,7 +88,7 @@ const initialTimetableForm = {
   room: "",
   location: "",
   status: "published",
-  session_type: "theory",
+  session_type: "study",
 };
 
 const initialExamForm = {
@@ -108,10 +117,28 @@ function formatDay(dayOfWeek) {
 }
 
 function formatTimeRange(startTime, endTime) {
-  if (startTime && endTime) return `${startTime} - ${endTime}`;
-  if (startTime) return startTime;
-  if (endTime) return endTime;
+  const normalizedStart = startTime ? String(startTime).slice(0, 5) : "";
+  const normalizedEnd = endTime ? String(endTime).slice(0, 5) : "";
+  if (normalizedStart && normalizedEnd) return `${normalizedStart} - ${normalizedEnd}`;
+  if (normalizedStart) return normalizedStart;
+  if (normalizedEnd) return normalizedEnd;
   return "--";
+}
+
+function resolveShiftByCode(shiftCode) {
+  return SHIFT_OPTIONS.find((option) => option.value === shiftCode) || null;
+}
+
+function resolveShiftByTime(startTime, endTime) {
+  const normalizedStart = startTime ? String(startTime).slice(0, 5) : "";
+  const normalizedEnd = endTime ? String(endTime).slice(0, 5) : "";
+  return SHIFT_OPTIONS.find((option) => option.start_time === normalizedStart && option.end_time === normalizedEnd) || null;
+}
+
+function formatShiftLabel(shiftCode, shiftName, startTime, endTime) {
+  const shift = resolveShiftByCode(shiftCode) || resolveShiftByTime(startTime, endTime);
+  const label = shiftName || shift?.label || shiftCode || "--";
+  return `${label} • ${formatTimeRange(startTime, endTime)}`;
 }
 
 function buildGroupParams(filters, contextReady, isUnclassifiedMode) {
@@ -302,6 +329,7 @@ export default function TimetableManagement() {
             course_id: entry.course_code || "",
             section_id: entry.section_id,
             day_of_week: String(entry.day_of_week),
+            shift_code: entry.shift_code || resolveShiftByTime(entry.start_time, entry.end_time)?.value || "",
             start_time: entry.start_time || "",
             end_time: entry.end_time || "",
             valid_from: entry.valid_from || activeTerm?.start_date || "",
@@ -309,7 +337,7 @@ export default function TimetableManagement() {
             room: entry.room || "",
             location: entry.location || "",
             status: entry.status || "published",
-            session_type: entry.session_type || "theory",
+            session_type: entry.session_type || "study",
           }
         : {
             ...initialTimetableForm,
@@ -371,15 +399,18 @@ export default function TimetableManagement() {
     const payload = {
       section_id: timetableForm.section_id,
       day_of_week: Number(timetableForm.day_of_week),
-      start_time: timetableForm.start_time || null,
-      end_time: timetableForm.end_time || null,
+      shift_code: timetableForm.shift_code || null,
       valid_from: timetableForm.valid_from || null,
       valid_to: timetableForm.valid_to || null,
       room: timetableForm.room || null,
       location: timetableForm.location || null,
       status: timetableForm.status || "published",
-      session_type: timetableForm.session_type || "theory",
+      session_type: timetableForm.session_type || "study",
     };
+    if (!payload.shift_code) {
+      setFeedback("Vui lòng chọn ca học chuẩn trước khi lưu lịch học.");
+      return;
+    }
     try {
       if (timetableForm.id) {
         await updateTimetableEntry(timetableForm.id, payload);
@@ -701,7 +732,7 @@ export default function TimetableManagement() {
                           <div key={item.id} className="admin-schedule-row">
                             <div className="admin-schedule-primary">
                               <strong>{item.section_code}</strong>
-                              <span>{formatDay(item.day_of_week)} • {formatTimeRange(item.start_time, item.end_time)}</span>
+                              <span>{formatDay(item.day_of_week)} • {formatShiftLabel(item.shift_code, item.shift_name, item.start_time, item.end_time)}</span>
                               <span>Loại buổi: {SESSION_TYPE_OPTIONS.find((option) => option.value === item.session_type)?.label || item.session_type || "--"}</span>
                             </div>
                             <div className="admin-schedule-secondary">
@@ -860,12 +891,28 @@ export default function TimetableManagement() {
 
               <div className="inline-form">
                 <label className="field-group">
-                  <span>Giờ bắt đầu</span>
-                  <input type="time" value={timetableForm.start_time} onChange={(event) => setTimetableForm((prev) => ({ ...prev, start_time: event.target.value }))} />
+                  <span>Ca học</span>
+                  <CustomSelect
+                    value={timetableForm.shift_code}
+                    onChange={(val) => {
+                      const shift = resolveShiftByCode(val);
+                      setTimetableForm((prev) => ({
+                        ...prev,
+                        shift_code: val,
+                        start_time: shift?.start_time || "",
+                        end_time: shift?.end_time || "",
+                      }));
+                    }}
+                    options={[
+                      { value: "", label: "Chọn ca học" },
+                      ...SHIFT_OPTIONS.map((shift) => ({ value: shift.value, label: `${shift.label} • ${shift.start_time} - ${shift.end_time}` })),
+                    ]}
+                    placeholder="Chọn ca học"
+                  />
                 </label>
                 <label className="field-group">
-                  <span>Giờ kết thúc</span>
-                  <input type="time" value={timetableForm.end_time} onChange={(event) => setTimetableForm((prev) => ({ ...prev, end_time: event.target.value }))} />
+                  <span>Giờ ca học</span>
+                  <input type="text" value={formatTimeRange(timetableForm.start_time, timetableForm.end_time)} readOnly />
                 </label>
                 <label className="field-group">
                   <span>Phòng</span>
