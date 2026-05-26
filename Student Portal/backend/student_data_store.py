@@ -1425,7 +1425,10 @@ def time_to_minutes(value) -> int | None:
 
 
 def is_time_overlap(new_start, new_end, old_start, old_end) -> bool:
-    return new_start < old_end and new_end > old_start
+    overlap_start = max(new_start, old_start)
+    overlap_end = min(new_end, old_end)
+    overlap_duration = overlap_end - overlap_start
+    return overlap_duration > 20
 
 
 def _schedule_day(value: dict):
