@@ -1152,6 +1152,7 @@ def import_teacher_course_grades(
     term: str,
     rows: list[dict],
 ) -> dict:
+    _ensure_loaded()
     assignment = _get_assignment(username, course_code, term)
     if not assignment:
         raise ValueError("Giảng viên không được phân công môn học này.")
@@ -1175,7 +1176,7 @@ def import_teacher_course_grades(
             )
             continue
 
-        raw_payload = get_raw_student_payload(mssv)
+        raw_payload = RAW_STUDENT_DB.get(mssv)
         if not raw_payload:
             errors.append(
                 {
