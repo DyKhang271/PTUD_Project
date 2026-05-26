@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 import logging
 from uuid import UUID
 
@@ -59,6 +59,25 @@ def _entry_period_overlaps(entry: TimetableEntry, start_period: int, end_period:
     return start_period <= entry.end_period and end_period >= entry.start_period
 
 
+def time_to_minutes(value) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, time):
+        return value.hour * 60 + value.minute
+    hour, minute = map(int, str(value)[:5].split(":"))
+    return hour * 60 + minute
+
+
+def is_time_overlap(new_start, new_end, old_start, old_end) -> bool:
+    new_start_minutes = time_to_minutes(new_start)
+    new_end_minutes = time_to_minutes(new_end)
+    old_start_minutes = time_to_minutes(old_start)
+    old_end_minutes = time_to_minutes(old_end)
+    if None in (new_start_minutes, new_end_minutes, old_start_minutes, old_end_minutes):
+        return False
+    return new_start_minutes < old_end_minutes and new_end_minutes > old_start_minutes
+
+
 def _entry_time_overlaps(entry: TimetableEntry, start_time, end_time) -> bool:
     if entry.start_time is None or entry.end_time is None or start_time is None or end_time is None:
         return False
@@ -96,9 +115,22 @@ def _time_ranges_overlap(
     start_b,
     end_b,
 ) -> bool:
-    if start_a is None or end_a is None or start_b is None or end_b is None:
-        return False
-    return start_a < end_b and start_b < end_a
+    return is_time_overlap(start_a, end_a, start_b, end_b)
+
+
+def _format_time(value) -> str:
+    if value is None:
+        return "--"
+    if isinstance(value, time):
+        return value.strftime("%H:%M")
+    return str(value)[:5]
+
+
+def _build_timetable_overlap_detail(entry: TimetableEntry, section: CourseSection) -> str:
+    return (
+        f"Lịch học bị trùng với môn {section.course_name} "
+        f"từ {_format_time(entry.start_time)} đến {_format_time(entry.end_time)}"
+    )
 
 
 def _timetable_entry_has_invalid_time_range(entry: TimetableEntry) -> bool:
@@ -252,7 +284,7 @@ def _validate_timetable_term_date_range(*, section: CourseSection, values: dict)
     valid_to = values.get("valid_to")
     if valid_from and (valid_from < term_start or valid_from > term_end):
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Ngày học nằm ngoài thời gian của học kỳ.",
         )
     if valid_to and (valid_to < term_start or valid_to > term_end):
@@ -360,7 +392,7 @@ def check_teacher_conflict(
     effective_from: date | None,
     effective_to: date | None,
     exclude_entry_id: UUID | None = None,
-) -> TimetableEntry | None:
+) -> tuple[TimetableEntry, CourseSection] | None:
     if not section.teacher_external_id or not section.term_id:
         return None
 
@@ -381,7 +413,7 @@ def check_teacher_conflict(
             effective_from=effective_from,
             effective_to=effective_to,
         ):
-            return entry
+            return entry, candidate_section
     return None
 
 
@@ -399,7 +431,7 @@ def check_room_conflict(
     effective_from: date | None,
     effective_to: date | None,
     exclude_entry_id: UUID | None = None,
-) -> TimetableEntry | None:
+) -> tuple[TimetableEntry, CourseSection] | None:
     normalized_room = (room or "").strip()
     normalized_campus = (campus or "").strip()
     if not normalized_room or not section.term_id:
@@ -423,7 +455,7 @@ def check_room_conflict(
             effective_from=effective_from,
             effective_to=effective_to,
         ):
-            return entry
+            return entry, get_section_or_404(db, entry.section_id)
     return None
 
 
@@ -439,9 +471,9 @@ def check_student_conflict(
     effective_from: date | None,
     effective_to: date | None,
     exclude_entry_id: UUID | None = None,
-) -> tuple[CourseSection | None, int]:
+) -> tuple[CourseSection | None, TimetableEntry | None, int]:
     if not section.term_id:
-        return None, 0
+        return None, None, 0
 
     student_ids = [
         row.student_external_id
@@ -449,7 +481,7 @@ def check_student_conflict(
         if row.enrollment_status == "active"
     ]
     if not student_ids:
-        return None, 0
+        return None, None, 0
 
     candidates = (
         db.execute(
@@ -490,8 +522,8 @@ def check_student_conflict(
             or 0
         )
         if conflict_count:
-            return candidate_section, conflict_count
-    return None, 0
+            return candidate_section, entry, conflict_count
+    return None, None, 0
 
 
 def _check_section_conflict(
@@ -816,8 +848,8 @@ def _validate_conflicts(
     )
     if section_conflict:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Lớp học phần này đã có lịch học trùng thời gian.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_timetable_overlap_detail(section_conflict, section),
         )
 
     teacher_conflict = check_teacher_conflict(
@@ -833,9 +865,10 @@ def _validate_conflicts(
         exclude_entry_id=exclude_entry_id,
     )
     if teacher_conflict:
+        conflict_entry, conflict_section = teacher_conflict
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Giảng viên đã có lịch dạy khác trong khung giờ này.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_timetable_overlap_detail(conflict_entry, conflict_section),
         )
 
     room_conflict = check_room_conflict(
@@ -853,12 +886,13 @@ def _validate_conflicts(
         exclude_entry_id=exclude_entry_id,
     )
     if room_conflict:
+        conflict_entry, conflict_section = room_conflict
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Phòng học này đã có lịch học khác trong khung giờ này.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_timetable_overlap_detail(conflict_entry, conflict_section),
         )
 
-    conflicting_section, conflict_count = check_student_conflict(
+    conflicting_section, conflicting_entry, conflict_count = check_student_conflict(
         db,
         section=section,
         day_of_week=day_of_week,
@@ -870,10 +904,10 @@ def _validate_conflicts(
         effective_to=valid_to,
         exclude_entry_id=exclude_entry_id,
     )
-    if conflicting_section and conflict_count:
+    if conflicting_section and conflicting_entry and conflict_count:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Có sinh viên bị trùng lịch học trong khung giờ này.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_build_timetable_overlap_detail(conflicting_entry, conflicting_section),
         )
 
     _validate_constraint_foundation(db, section=section, values=values)

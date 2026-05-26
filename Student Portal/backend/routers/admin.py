@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -137,11 +137,16 @@ def get_admin_schedule():
 @router.post("/schedule")
 def create_schedule(data: dict):
     success, msg = add_schedule_item(data)
+    if not success:
+        raise HTTPException(status_code=400, detail=msg)
     return {"success": success, "message": msg}
 
 @router.put("/schedule/{item_id}")
 def update_schedule(item_id: str, data: dict):
     success, msg = update_schedule_item(item_id, data)
+    if not success:
+        status_code = 404 if "Kh" in msg and "t" in msg else 400
+        raise HTTPException(status_code=status_code, detail=msg)
     return {"success": success, "message": msg}
 
 @router.delete("/schedule/{item_id}")

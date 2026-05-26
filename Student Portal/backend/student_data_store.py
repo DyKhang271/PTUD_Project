@@ -1399,12 +1399,91 @@ def bulk_add_teachers(teachers: list[dict]) -> tuple[bool, str]:
 
 
 # --- THỜI KHÓA BIỂU CRUD ---
+def time_to_minutes(value) -> int | None:
+    if value in (None, ""):
+        return None
+    hour, minute = map(int, str(value)[:5].split(":"))
+    return hour * 60 + minute
+
+
+def is_time_overlap(new_start, new_end, old_start, old_end) -> bool:
+    return new_start < old_end and new_end > old_start
+
+
+def _schedule_day(value: dict):
+    return value.get("ngay_hoc") or value.get("date") or value.get("thu") or value.get("day_of_week")
+
+
+def _schedule_time_range(value: dict) -> tuple[int | None, int | None]:
+    start_time = value.get("start_time") or value.get("gio_bat_dau")
+    end_time = value.get("end_time") or value.get("gio_ket_thuc")
+    if start_time and end_time:
+        return time_to_minutes(start_time), time_to_minutes(end_time)
+
+    start_period = value.get("tiet_bat_dau") or value.get("start_period")
+    end_period = value.get("tiet_ket_thuc") or value.get("end_period")
+    if start_period in (None, "") or end_period in (None, ""):
+        return None, None
+    return int(start_period), int(end_period) + 1
+
+
+def _schedule_student_ids(value: dict) -> set[str]:
+    raw_students = value.get("student_ids") or value.get("students") or value.get("mssv")
+    if raw_students is None:
+        return set()
+    if isinstance(raw_students, str):
+        return {item.strip() for item in raw_students.split(",") if item.strip()}
+    if isinstance(raw_students, list):
+        return {str(item).strip() for item in raw_students if str(item).strip()}
+    normalized = str(raw_students).strip()
+    return {normalized} if normalized else set()
+
+
+def _is_same_schedule_owner(new_item: dict, old_item: dict) -> bool:
+    new_section = str(new_item.get("class_section_code") or new_item.get("ma_mon") or "").strip()
+    old_section = str(old_item.get("class_section_code") or old_item.get("ma_mon") or "").strip()
+    if new_section and old_section and new_section == old_section:
+        return True
+
+    new_students = _schedule_student_ids(new_item)
+    old_students = _schedule_student_ids(old_item)
+    return bool(new_students and old_students and new_students.intersection(old_students))
+
+
+def _find_schedule_conflict(data: dict, *, exclude_item_id: str | None = None) -> dict | None:
+    new_day = _schedule_day(data)
+    new_start, new_end = _schedule_time_range(data)
+    if new_day in (None, "") or new_start is None or new_end is None:
+        return None
+
+    for item in SCHEDULE_DB:
+        if exclude_item_id and str(item.get("id")) == str(exclude_item_id):
+            continue
+        if _schedule_day(item) != new_day:
+            continue
+        old_start, old_end = _schedule_time_range(item)
+        if old_start is None or old_end is None:
+            continue
+        if _is_same_schedule_owner(data, item) and is_time_overlap(new_start, new_end, old_start, old_end):
+            return item
+    return None
+
+
+def _schedule_conflict_message(item: dict) -> str:
+    start_time = item.get("start_time") or item.get("gio_bat_dau") or f"tiết {item.get('tiet_bat_dau', '--')}"
+    end_time = item.get("end_time") or item.get("gio_ket_thuc") or f"tiết {item.get('tiet_ket_thuc', '--')}"
+    return f"Lịch học bị trùng với môn {item.get('mon') or item.get('course_name') or '--'} từ {start_time} đến {end_time}"
+
+
 def get_all_schedule_admin() -> list[dict]:
     _ensure_loaded()
     return SCHEDULE_DB
 
 def add_schedule_item(data: dict) -> tuple[bool, str]:
     _ensure_loaded()
+    conflict = _find_schedule_conflict(data)
+    if conflict:
+        return False, _schedule_conflict_message(conflict)
     new_id = data.get("id") or str(uuid.uuid4())
     data["id"] = new_id
     SCHEDULE_DB.append(data)
@@ -1415,6 +1494,10 @@ def update_schedule_item(item_id: str, data: dict) -> tuple[bool, str]:
     _ensure_loaded()
     for item in SCHEDULE_DB:
         if str(item.get("id")) == str(item_id):
+            merged = {**item, **data}
+            conflict = _find_schedule_conflict(merged, exclude_item_id=item_id)
+            if conflict:
+                return False, _schedule_conflict_message(conflict)
             item.update(data)
             _persist_runtime_state()
             return True, "Cập nhật thời khóa biểu thành công."

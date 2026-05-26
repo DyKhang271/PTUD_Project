@@ -336,7 +336,27 @@ def _get_timetable_entry(
     )
 
 
+def _validate_timetable_entry_write(
+    db: Session,
+    *,
+    section: CourseSection,
+    values: dict[str, Any],
+    existing: TimetableEntry | None = None,
+) -> None:
+    from app.services.timetable_service import _validate_conflicts
+
+    _validate_conflicts(
+        db,
+        section=section,
+        values=values,
+        exclude_entry_id=existing.id if existing else None,
+    )
+
+
 def _upsert_timetable_entry(db: Session, *, section_id: UUID, blueprint: dict[str, Any]) -> tuple[TimetableEntry, bool]:
+    section = section_repo.get_section(db, section_id)
+    if section is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course section not found")
     entry = _get_timetable_entry(
         db,
         section_id=section_id,
@@ -360,6 +380,7 @@ def _upsert_timetable_entry(db: Session, *, section_id: UUID, blueprint: dict[st
         "session_type": blueprint.get("session_type", "study"),
         "note": blueprint.get("note"),
     }
+    _validate_timetable_entry_write(db, section=section, values=values, existing=entry)
     created = False
     if entry is None:
         entry = timetable_repo.create_timetable_entry(db, values)
@@ -1228,6 +1249,7 @@ def _upsert_timetable_entry_for_section(
             TimetableEntry.room == values.get("room"),
         )
     )
+    _validate_timetable_entry_write(db, section=section, values=values, existing=existing)
     if existing is None:
         timetable_repo.create_timetable_entry(db, values)
         return "created"
@@ -1297,6 +1319,7 @@ def import_timetable_entries_from_payload(db: Session, payload: dict[str, Any]) 
                 "note": entry.get("note"),
             }
 
+            _validate_timetable_entry_write(db, section=section, values=values, existing=existing)
             if existing is None:
                 timetable_repo.create_timetable_entry(db, values)
                 created += 1

@@ -251,8 +251,8 @@ export default function AdminDashboard() {
       }
       setShowScheduleModal(false);
       fetchData();
-    } catch {
-      showToast('Lỗi thao tác TKB');
+    } catch (err) {
+      showToast(err?.response?.data?.detail || err?.response?.data?.message || 'Lỗi thao tác TKB');
     }
   };
   
