@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: student-portal-backend
+    runtime: python
+    plan: free
+    rootDir: Student Portal/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PORTAL_JWT_SECRET
+        generateValue: true
+      - key: INTERNAL_API_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: CHATBOT_AI_ENABLED
+        value: "0"
+
+  - type: web
+    name: timetable-backend
+    runtime: python
+    plan: free
+    rootDir: timetable
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PORTAL_JWT_SECRET
+        sync: false
+      - key: CORE_API_KEY
+        sync: false
+      - key: CORE_API_BASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
