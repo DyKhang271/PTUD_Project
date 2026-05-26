@@ -37,10 +37,10 @@ call :wait_for_http "Timetable API" "http://localhost:8001/" 60 || exit /b 1
 call :wait_for_http "Timetable frontend" "http://localhost:5174/" 60 || exit /b 1
 call :wait_for_http "Ollama API" "http://localhost:11434/api/tags" 60 || exit /b 1
 
-docker compose exec -T ollama ollama show qwen2.5:3b-instruct >nul 2>nul
+docker compose exec -T ollama ollama show "qwen2.5:3b-instruct" >nul 2>nul
 if errorlevel 1 (
   echo Pulling Ollama model qwen2.5:3b-instruct...
-  docker compose exec -T ollama ollama pull qwen2.5:3b-instruct
+  docker compose exec -T ollama ollama pull "qwen2.5:3b-instruct"
   if errorlevel 1 exit /b 1
 )
 
