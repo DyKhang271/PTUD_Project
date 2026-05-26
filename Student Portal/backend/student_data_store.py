@@ -910,6 +910,39 @@ def _get_assignment(username: str, course_code: str, term: str) -> dict | None:
     return None
 
 
+def _build_teacher_course_row(public_student: dict, course: dict) -> dict:
+    scores = extract_detailed_component_scores(
+        course.get("component_scores"),
+        course.get("midterm_scores"),
+    )
+    return {
+        "mssv": public_student["mssv"],
+        "ho_ten": public_student["ho_ten"],
+        "lop": public_student["lop"],
+        "nganh": public_student["nganh"],
+        "term": course["term"],
+        "course_code": course["class_section_code"][:10],
+        "class_section_code": course["class_section_code"],
+        "course_name": course["course_name"],
+        "credits": course["credits"],
+        "diem_thuong_ky_1": scores["diem_thuong_ky_1"],
+        "diem_thuong_ky_2": scores["diem_thuong_ky_2"],
+        "diem_thuc_hanh_1": scores["diem_thuc_hanh_1"],
+        "diem_thuc_hanh_2": scores["diem_thuc_hanh_2"],
+        "diem_qt": scores["diem_qt"],
+        "diem_gk": scores["diem_gk"],
+        "diem_ck": scores["diem_ck"],
+        "diem_tk_10": course.get("final_score"),
+        "diem_tk_4": course.get("gpa4"),
+        "xep_loai": course.get("letter"),
+        "xep_loai_chi_tiet": course.get("classification"),
+        "trang_thai": _normalize_course_status(
+            course.get("status"),
+            course.get("final_score"),
+        ),
+    }
+
+
 def _get_teacher_course_rows(username: str, course_code: str | None = None, term: str | None = None) -> list[dict]:
     _ensure_loaded()
     assignments = _get_teacher_assignments(username)
@@ -930,39 +963,7 @@ def _get_teacher_course_rows(username: str, course_code: str | None = None, term
                 continue
             if term and current_term != term:
                 continue
-
-            scores = extract_detailed_component_scores(
-                course.get("component_scores"),
-                course.get("midterm_scores"),
-            )
-            rows.append(
-                {
-                    "mssv": public_student["mssv"],
-                    "ho_ten": public_student["ho_ten"],
-                    "lop": public_student["lop"],
-                    "nganh": public_student["nganh"],
-                    "term": current_term,
-                    "course_code": current_course_code,
-                    "class_section_code": course["class_section_code"],
-                    "course_name": course["course_name"],
-                    "credits": course["credits"],
-                    "diem_thuong_ky_1": scores["diem_thuong_ky_1"],
-                    "diem_thuong_ky_2": scores["diem_thuong_ky_2"],
-                    "diem_thuc_hanh_1": scores["diem_thuc_hanh_1"],
-                    "diem_thuc_hanh_2": scores["diem_thuc_hanh_2"],
-                    "diem_qt": scores["diem_qt"],
-                    "diem_gk": scores["diem_gk"],
-                    "diem_ck": scores["diem_ck"],
-                    "diem_tk_10": course.get("final_score"),
-                    "diem_tk_4": course.get("gpa4"),
-                    "xep_loai": course.get("letter"),
-                    "xep_loai_chi_tiet": course.get("classification"),
-                    "trang_thai": _normalize_course_status(
-                        course.get("status"),
-                        course.get("final_score"),
-                    ),
-                }
-            )
+            rows.append(_build_teacher_course_row(public_student, course))
 
     rows.sort(key=lambda item: (get_term_sort_key(item["term"]), item["course_code"], item["mssv"]))
     return rows
@@ -1044,11 +1045,20 @@ def _find_transcript_course(
     ]
 
     if class_section_code:
-        matches = [
+        section_matches = [
             course
             for course in matches
             if course["class_section_code"] == class_section_code
         ]
+        if section_matches:
+            matches = section_matches
+        elif len(matches) == 1:
+            # CSV imports may carry a section code copied from another student's row.
+            # If this student has only one matching course in the selected term/course,
+            # fall back to that unique record instead of failing the whole row.
+            return matches[0]
+        else:
+            matches = section_matches
 
     if not matches:
         raise ValueError("Khong tim thay hoc phan can cap nhat diem.")
@@ -1151,6 +1161,7 @@ def import_teacher_course_grades(
     imported_count = 0
     errors: list[dict] = []
     updated_students: set[str] = set()
+    updated_rows: list[dict] = []
 
     for index, row in enumerate(rows, start=1):
         row_number = row.get("row_number") or index + 1
@@ -1211,6 +1222,12 @@ def import_teacher_course_grades(
         _rebuild_student_record(mssv)
         updated_students.add(mssv)
         imported_count += 1
+        updated_rows.append(
+            _build_teacher_course_row(
+                STUDENT_DB[mssv]["student"],
+                target_course,
+            )
+        )
 
     if imported_count:
         _persist_runtime_state()
@@ -1224,6 +1241,7 @@ def import_teacher_course_grades(
         "imported_count": imported_count,
         "error_count": len(errors),
         "updated_students": sorted(updated_students),
+        "updated_rows": updated_rows,
         "errors": errors[:20],
     }
 

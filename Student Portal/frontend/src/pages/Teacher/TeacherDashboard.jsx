@@ -190,6 +190,25 @@ function buildImportFeedback(result) {
   return `Đã import ${importedCount} dòng, còn ${errorCount} dòng lỗi. ${sample}`;
 }
 
+function mergeStudentRows(currentRows, importedRows) {
+  const merged = new Map();
+
+  for (const row of currentRows || []) {
+    merged.set(`${row.mssv}__${row.class_section_code}`, row);
+  }
+
+  for (const row of importedRows || []) {
+    merged.set(`${row.mssv}__${row.class_section_code}`, row);
+  }
+
+  return [...merged.values()].sort((left, right) => {
+    if (left.mssv !== right.mssv) {
+      return left.mssv.localeCompare(right.mssv);
+    }
+    return (left.class_section_code || '').localeCompare(right.class_section_code || '');
+  });
+}
+
 export default function TeacherDashboard() {
   const { user } = useAuth();
   const [overview, setOverview] = useState(null);
@@ -268,7 +287,7 @@ export default function TeacherDashboard() {
 
   const loadRoster = useCallback(async (course) => {
     if (!user?.username || !course) {
-      return;
+      return [];
     }
 
     setRosterLoading(true);
@@ -276,9 +295,11 @@ export default function TeacherDashboard() {
       const res = await getTeacherCourseStudents(user.username, course.course_code, course.term);
       setStudents(res.data.students);
       setError('');
+      return res.data.students || [];
     } catch (err) {
       setStudents([]);
       setError(getErrorMessage(err, 'Không thể tải danh sách sinh viên.'));
+      return [];
     } finally {
       setRosterLoading(false);
     }
@@ -294,7 +315,7 @@ export default function TeacherDashboard() {
     if (selectedCourse) {
       loadRoster(selectedCourse);
     }
-  }, [selectedCourse, loadRoster]);
+  }, [selectedCourseKey, loadRoster]);
 
   const handleSaveGrade = async (payload) => {
     setSaving(true);
@@ -339,7 +360,9 @@ export default function TeacherDashboard() {
       });
 
       await loadOverviewAndCourses();
-      await loadRoster(selectedCourse);
+      if (res.data.updated_rows?.length) {
+        setStudents((current) => mergeStudentRows(current, res.data.updated_rows));
+      }
 
       const feedback = buildImportFeedback(res.data);
       setError(feedback);
