@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Layout/Sidebar';
 import Topbar from './components/Layout/Topbar';
@@ -12,6 +12,9 @@ import Grades from './pages/Grades/Grades';
 import Curriculum from './pages/Curriculum/Curriculum';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import TeacherDashboard from './pages/Teacher/TeacherDashboard';
+
+const ThemeContext = createContext();
+export const useTheme = () => useContext(ThemeContext);
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
@@ -34,28 +37,7 @@ function ProtectedRoute() {
 function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
-
-  const [isDarkTheme, setIsDarkTheme] = useState(() => {
-    return localStorage.getItem('theme') === 'dark';
-  });
-
-  useEffect(() => {
-    if (isDarkTheme) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('theme', 'light');
-    }
-  }, [isDarkTheme]);
-
-  const toggleTheme = () => {
-    document.documentElement.classList.add('theme-transition');
-    setIsDarkTheme(!isDarkTheme);
-    setTimeout(() => {
-      document.documentElement.classList.remove('theme-transition');
-    }, 400);
-  };
+  const { isDarkTheme, toggleTheme } = useTheme();
 
   return (
     <div className="layout-wrapper">
@@ -83,8 +65,8 @@ function Layout() {
 function AdminLayout() {
   const { logout } = useAuth();
   return (
-    <div className="layout-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f0f2f5' }}>
-      <div style={{ background: '#fff', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', zIndex: 10 }}>
+    <div className="layout-wrapper" style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: 'var(--bg)' }}>
+      <div style={{ background: 'var(--bg-card)', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', zIndex: 10 }}>
         <h1 style={{ fontSize: '1.25rem', color: 'var(--primary)', fontWeight: 'bold', margin: 0 }}>🛡️ IUH Portal - Phân Quyền Quản Trị</h1>
         <button onClick={logout} style={{ padding: '8px 16px', background: 'var(--accent)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontWeight: 'bold', color: 'var(--text)' }}>
           Đăng xuất
@@ -101,8 +83,8 @@ function TeacherLayout() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="layout-wrapper" style={{ display: 'block', background: 'linear-gradient(180deg, #f4f7fb 0%, #eef3f9 100%)' }}>
-      <div style={{ background: '#fff', padding: '18px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', gap: 16 }}>
+    <div className="layout-wrapper" style={{ display: 'block', minHeight: '100vh', background: 'var(--bg)' }}>
+      <div style={{ background: 'var(--bg-card)', padding: '18px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', gap: 16 }}>
         <div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>IUH Portal</div>
           <h1 style={{ fontSize: '1.35rem', color: 'var(--primary)', fontWeight: 800 }}>Không gian giảng viên</h1>
@@ -163,11 +145,35 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const [isDarkTheme, setIsDarkTheme] = useState(() => {
+    return localStorage.getItem('theme') === 'dark';
+  });
+
+  useEffect(() => {
+    if (isDarkTheme) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkTheme]);
+
+  const toggleTheme = () => {
+    document.documentElement.classList.add('theme-transition');
+    setIsDarkTheme(!isDarkTheme);
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-transition');
+    }, 400);
+  };
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeContext.Provider value={{ isDarkTheme, toggleTheme }}>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeContext.Provider>
   );
 }

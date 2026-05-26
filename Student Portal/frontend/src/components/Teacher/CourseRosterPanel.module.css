@@ -221,3 +221,33 @@
     width: 100%;
   }
 }
+
+:global([data-theme='dark']) .sidebar,
+:global([data-theme='dark']) .content {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+:global([data-theme='dark']) .courseCard {
+  background: var(--bg);
+  border-color: var(--border);
+}
+
+:global([data-theme='dark']) .courseCardActive {
+  border-color: var(--primary-light);
+  box-shadow: 0 10px 24px rgba(59, 130, 246, 0.15);
+}
+
+:global([data-theme='dark']) .templateButton {
+  background: var(--bg-card);
+  color: var(--text);
+}
+
+:global([data-theme='dark']) .table th {
+  background: var(--bg);
+  border-bottom-color: var(--border);
+}
+
+:global([data-theme='dark']) .table td {
+  border-bottom-color: var(--border);
+}

@@ -132,18 +132,41 @@ export default function Grades() {
 
     const doc = new jsPDF({ orientation: 'landscape' });
 
+    let hasLoadedFont = false;
+    try {
+      const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
+      const response = await fetch(fontUrl);
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        let binary = '';
+        const bytes = new Uint8Array(arrayBuffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i += 1) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+        doc.addFileToVFS('Roboto-Regular.ttf', base64);
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+        doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bold');
+        doc.setFont('Roboto');
+        hasLoadedFont = true;
+      }
+    } catch (err) {
+      console.error('Failed to load Unicode font, falling back to default font:', err);
+    }
+
     doc.setFontSize(18);
     doc.setTextColor(26, 60, 110);
-    doc.text('BANG DIEM SINH VIEN', 148, 20, { align: 'center' });
+    doc.text('BẢNG ĐIỂM SINH VIÊN', 148, 20, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
-    doc.text(`Ho ten: ${student?.ho_ten || ''}`, 14, 35);
+    doc.text(`Họ tên: ${student?.ho_ten || ''}`, 14, 35);
     doc.text(`MSSV: ${student?.mssv || ''}`, 14, 42);
-    doc.text(`Nganh: ${student?.nganh || ''}`, 14, 49);
-    doc.text(`GPA Tich luy: ${summary?.gpa_tich_luy?.toFixed(2) || ''}`, 200, 35);
-    doc.text(`Xep loai: ${summary?.xep_loai || ''}`, 200, 42);
-    doc.text(`Hoc ky: ${semesterData?.hoc_ky || selectedSemester}`, 200, 49);
+    doc.text(`Ngành: ${student?.nganh || ''}`, 14, 49);
+    doc.text(`GPA Tích lũy: ${summary?.gpa_tich_luy?.toFixed(2) || ''}`, 200, 35);
+    doc.text(`Xếp loại: ${summary?.xep_loai || ''}`, 200, 42);
+    doc.text(`Học kỳ: ${semesterData?.hoc_ky || selectedSemester}`, 200, 49);
 
     const tableData = courses.map((course) => [
       course.stt,
@@ -159,16 +182,24 @@ export default function Grades() {
       startY: 58,
       head: [[
         'STT',
-        'Ma mon',
-        'Ten mon',
+        'Mã môn',
+        'Tên môn',
         'TC',
         ...scoreColumns.map((column) => column.label),
-        'Xep loai',
-        'Trang thai',
+        'Xếp loại',
+        'Trạng thái',
       ]],
       body: tableData,
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [26, 60, 110], textColor: 255 },
+      styles: { 
+        ...(hasLoadedFont ? { font: 'Roboto' } : {}), 
+        fontSize: 8, 
+        cellPadding: 3 
+      },
+      headStyles: { 
+        ...(hasLoadedFont ? { font: 'Roboto' } : {}), 
+        fillColor: [26, 60, 110], 
+        textColor: 255 
+      },
       alternateRowStyles: { fillColor: [245, 247, 250] },
     });
 
@@ -332,7 +363,7 @@ export default function Grades() {
 
       <div className={styles.exportRow}>
         <button className={styles.exportBtn} onClick={handleExportPDF}>
-          Xuat PDF
+          Xuất PDF
         </button>
       </div>
     </div>

@@ -275,6 +275,7 @@
   font-size: 0.95rem;
   outline: none;
   background: var(--bg);
+  color: var(--text);
 }
 
 .formGroup input:focus, .formGroup select:focus, .formGroup textarea:focus {
@@ -523,4 +524,70 @@
   .resultGrid {
     grid-template-columns: 1fr;
   }
+}
+
+:global([data-theme='dark']) .modalContent {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+:global([data-theme='dark']) .cancelBtn {
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:global([data-theme='dark']) .summaryCard {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+:global([data-theme='dark']) .editBtn {
+  background: rgba(3, 105, 161, 0.15);
+  color: #38bdf8;
+  border-color: rgba(3, 105, 161, 0.3);
+}
+
+:global([data-theme='dark']) .deleteBtn {
+  background: rgba(185, 28, 28, 0.15);
+  color: #f87171;
+  border-color: rgba(185, 28, 28, 0.3);
+}
+
+:global([data-theme='dark']) .menuItemActive {
+  background: var(--accent);
+  color: var(--primary);
+  border-left-color: var(--primary);
+}
+
+:global([data-theme='dark']) .table th {
+  background: var(--bg-card);
+  border-bottom-color: var(--border);
+}
+
+:global([data-theme='dark']) .secondaryBtn {
+  background: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+:global([data-theme='dark']) .settingInput input {
+  background: var(--bg);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+:global([data-theme='dark']) .badgeSuccess {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+:global([data-theme='dark']) .badgeNeutral {
+  background: rgba(107, 114, 128, 0.15);
+  color: #cbd5e1;
+}
+
+:global([data-theme='dark']) .badgeDanger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
 }

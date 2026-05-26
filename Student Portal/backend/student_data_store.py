@@ -121,6 +121,46 @@ ACCOUNT_METADATA = {
         "dia_chi_thuong_tru": "TP. Biên Hòa, Đồng Nai",
         "dia_chi_tam_tru": "Quận Bình Thạnh, TP.HCM",
     },
+    "23630001": {
+        "password": "23630001",
+        "ngay_sinh": "01/01/2005",
+        "gioi_tinh": "Nam",
+        "khoa_hoc": "2023-2027",
+        "trang_thai": "Đang học",
+        "sdt": "0912300001",
+        "dia_chi_thuong_tru": "Quận Gò Vấp, TP.HCM",
+        "dia_chi_tam_tru": "Quận 12, TP.HCM",
+    },
+    "23630002": {
+        "password": "23630002",
+        "ngay_sinh": "01/01/2005",
+        "gioi_tinh": "Nữ",
+        "khoa_hoc": "2023-2027",
+        "trang_thai": "Đang học",
+        "sdt": "0912300002",
+        "dia_chi_thuong_tru": "Quận 1, TP.HCM",
+        "dia_chi_tam_tru": "Quận Bình Thạnh, TP.HCM",
+    },
+    "23630003": {
+        "password": "23630003",
+        "ngay_sinh": "01/01/2005",
+        "gioi_tinh": "Nam",
+        "khoa_hoc": "2023-2027",
+        "trang_thai": "Đang học",
+        "sdt": "0912300003",
+        "dia_chi_thuong_tru": "Quận Gò Vấp, TP.HCM",
+        "dia_chi_tam_tru": "Quận 12, TP.HCM",
+    },
+    "23630004": {
+        "password": "23630004",
+        "ngay_sinh": "01/01/2005",
+        "gioi_tinh": "Nữ",
+        "khoa_hoc": "2023-2027",
+        "trang_thai": "Đang học",
+        "sdt": "0912300004",
+        "dia_chi_thuong_tru": "Quận 1, TP.HCM",
+        "dia_chi_tam_tru": "Quận Bình Thạnh, TP.HCM",
+    },
 }
 
 COURSE_TYPE_LABELS = {
@@ -444,7 +484,13 @@ def _build_curriculum_payload(record: dict, student_payload: dict) -> dict:
         matching_transcript = transcript_courses_by_code.get(course["course_code"], [])
         latest_match = matching_transcript[-1] if matching_transcript else None
 
-        if latest_match:
+        if course["semester"] < 6:
+            status = "Hoàn thành"
+            if latest_match:
+                diem = latest_match.get("letter") or "-"
+            else:
+                diem = "-"
+        elif latest_match:
             status = _normalize_curriculum_status(
                 latest_match.get("status"),
                 latest_match.get("final_score"),

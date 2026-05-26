@@ -92,3 +92,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+:global([data-theme='dark']) .hero > div,
+:global([data-theme='dark']) .heroCard {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
