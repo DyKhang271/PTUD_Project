@@ -76,7 +76,7 @@ for /L %%I in (1,1,%MAX_ATTEMPTS%) do (
     exit /b 0
   )
   echo Waiting for %SERVICE_NAME% ^(%%I/%MAX_ATTEMPTS%%^)...
-  timeout /t 5 /nobreak >nul
+  ping 127.0.0.1 -n 6 >nul
 )
 
 echo %SERVICE_NAME% did not become ready: %SERVICE_URL%
