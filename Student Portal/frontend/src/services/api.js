@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 10000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -16,8 +16,6 @@ const withStudentParams = (mssv, extraParams = {}) => ({
 });
 
 export const getStudent = (mssv) => api.get('/student', withStudentParams(mssv));
-
-export const getSchedule = () => api.get('/schedule');
 
 export const getNotifications = () => api.get('/notifications');
 
@@ -104,11 +102,6 @@ export const bulkImportAdminStudents = (data) => api.post('/admin/students/bulk'
 export const updateAdminTeacher = (username, data) => api.put(`/admin/teachers/${username}`, data);
 export const deleteAdminTeacher = (username) => api.delete(`/admin/teachers/${username}`);
 export const bulkImportAdminTeachers = (data) => api.post('/admin/teachers/bulk', data);
-
-export const getAdminSchedule = () => api.get('/admin/schedule');
-export const createAdminSchedule = (data) => api.post('/admin/schedule', data);
-export const updateAdminSchedule = (id, data) => api.put(`/admin/schedule/${id}`, data);
-export const deleteAdminSchedule = (id) => api.delete(`/admin/schedule/${id}`);
 
 export const getAdminNotifications = () => api.get('/admin/notifications');
 export const createAdminNotification = (data) => api.post('/admin/notifications', data);

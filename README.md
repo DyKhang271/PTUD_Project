@@ -209,3 +209,55 @@ docker compose up -d --build
 ```
 
 Khi chạy cách này, Student Portal phải đang chạy bên ngoài tại `http://localhost:8000`.
+
+## Triển khai Đám mây trực tuyến (Cloud Deployment)
+
+Hệ thống hỗ trợ cấu hình triển khai hoàn toàn miễn phí trên các nền tảng đám mây tự động:
+- **Tầng dữ liệu (Database)**: PostgreSQL trên [Neon.tech](https://neon.tech/) (hoặc Supabase).
+- **Tầng API / Backend**: [Render.com](https://render.com/) (Web Services miễn phí).
+- **Tầng Giao diện (Frontend)**: [Vercel.com](https://vercel.com/) (React/Vite).
+
+Sử dụng tệp cấu hình [render.yaml](file:///d:/Tailieuhoc/Nam_3/PTUD/project/PTUD_Project_main/render.yaml) để tự động hóa việc khởi tạo dịch vụ trên Render thông qua chức năng Blueprint.
+
+### 1. Cấu hình Cơ sở dữ liệu (Neon DB)
+Đăng ký tài khoản Neon.tech, tạo Project PostgreSQL 16 và nhận chuỗi kết nối (`Connection String`):
+`postgresql://neondb_owner:password@host.neon.tech/neondb?sslmode=require`
+
+### 2. Triển khai Backend APIs trên Render.com
+Sử dụng Render Blueprint hoặc thiết lập thủ công:
+- **Student Portal API (`ptud-student-portal-api`)**:
+  - Root Directory: `Student Portal/backend`
+  - Runtime: `Python`, Build Command: `pip install -r requirements.txt`, Start Command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+  - Các biến môi trường bắt buộc:
+    - `DATABASE_URL`: *(Chuỗi kết nối Neon DB)*
+    - `PORTAL_JWT_SECRET`: `student-portal-dev-secret`
+    - `INTERNAL_API_KEY`: `dev-internal-secret`
+    - `ALLOWED_ORIGINS`: `*`
+- **Timetable API (`ptud-timetable-api`)**:
+  - Root Directory: `timetable`
+  - Runtime: `Python`, Build Command: `pip install -r requirements.txt && pip install python-multipart`, Start Command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+  - Các biến môi trường bắt buộc:
+    - `DATABASE_URL`: *(Chuỗi kết nối Neon DB, khuyên dùng tên DB/schema riêng)*
+    - `CORE_API_BASE_URL`: *(URL của Student Portal API trên Render)*
+    - `CORE_API_KEY`: `dev-internal-secret`
+    - `PORTAL_JWT_SECRET`: `student-portal-dev-secret`
+    - `ALLOWED_ORIGINS`: `*`
+
+### 3. Triển khai Frontends trên Vercel.com
+Liên kết với kho chứa GitHub và import dự án:
+- **Student Portal Frontend**:
+  - Root Directory: `Student Portal/frontend`, Framework Preset: `Vite`
+  - Biến môi trường: `VITE_API_BASE_URL` = `https://[PORTAL-API-URL-ON-RENDER]/api`
+- **Timetable Frontend**:
+  - Root Directory: `timetable/frontend`, Framework Preset: `Vite`
+  - Biến môi trường: 
+    - `VITE_TIMETABLE_API_BASE_URL` = `https://[TIMETABLE-API-URL-ON-RENDER]`
+    - `VITE_PORTAL_API_BASE_URL` = `https://[PORTAL-API-URL-ON-RENDER]/api`
+
+### 4. Cấu hình Chatbot Cloud AI
+Để chatbot RAG hoạt động tối ưu trên máy chủ free mà không cần Ollama cục bộ, khai báo thêm các biến môi trường sau cho Student Portal API trên Render:
+- `CHATBOT_AI_ENABLED` = `1`
+- `CHATBOT_AI_PROVIDER` = `openai-compatible`
+- `OPENAI_API_KEY` = *(Mã API của bạn, ví dụ từ OpenAI hoặc Groq)*
+- `OPENAI_BASE_URL` = `https://api.openai.com/v1` (Hoặc URL Groq)
+- `OPENAI_MODEL` = `gpt-4o-mini` (Hoặc model Groq bạn chọn)

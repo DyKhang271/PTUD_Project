@@ -16,6 +16,7 @@ venv/
 
 # Backend local storage
 backend/storage/
+.codex-tools/
 
 # Node / npm
 node_modules/

@@ -42,29 +42,28 @@ export default function StudentDashboard() {
 
   async function load() {
     setState((prev) => ({ ...prev, loading: true, error: "" }));
-    try {
-      const now = new Date();
-      const weekStart = getWeekStart(now);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      const [summary, timetable, exams] = await Promise.all([
-        fetchStudentAttendanceSummary(),
-        fetchStudentTimetable({
-          date_from: toDateInputValue(weekStart),
-          date_to: toDateInputValue(weekEnd),
-        }),
-        fetchStudentExams(),
-      ]);
-      setState({ loading: false, error: "", summary, timetable, exams });
-    } catch (err) {
-      setState({
-        loading: false,
-        error: err?.response?.data?.detail || "Không tải được dashboard sinh viên.",
-        summary: [],
-        timetable: [],
-        exams: [],
-      });
-    }
+    const currentDate = new Date();
+    const currentWeekStart = getWeekStart(currentDate);
+    const currentWeekEnd = new Date(currentWeekStart);
+    currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
+
+    setState({ loading: false, error: "", summary: [], timetable: [], exams: [] });
+
+    const [summaryResult, timetableResult, examsResult] = await Promise.allSettled([
+      fetchStudentAttendanceSummary(),
+      fetchStudentTimetable({
+        date_from: toDateInputValue(currentWeekStart),
+        date_to: toDateInputValue(currentWeekEnd),
+      }),
+      fetchStudentExams(),
+    ]);
+
+    setState((prev) => ({
+      ...prev,
+      summary: summaryResult.status === "fulfilled" && Array.isArray(summaryResult.value) ? summaryResult.value : [],
+      timetable: timetableResult.status === "fulfilled" && Array.isArray(timetableResult.value) ? timetableResult.value : [],
+      exams: examsResult.status === "fulfilled" && Array.isArray(examsResult.value) ? examsResult.value : [],
+    }));
   }
 
   useEffect(() => {

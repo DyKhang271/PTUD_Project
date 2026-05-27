@@ -7,7 +7,7 @@ import re
 from .db_retriever import CourseLookupResult, fetch_student_bundle, find_course_lookup, looks_like_student_academic_query
 from .documents import normalize_text
 from .history import append_session_message, get_session_history
-from .llm_client import OllamaClient, OllamaUnavailableError
+from .llm_client import OllamaClient, OllamaUnavailableError, OpenAICompatibleClient, OpenAICompatibleUnavailableError
 from .retriever import RetrievedSnippet, retrieve_document_snippets
 from .settings import get_chatbot_settings
 from .student_context import StudentContext, build_student_context
@@ -848,6 +848,7 @@ class ChatbotService:
     def __init__(self) -> None:
         self.settings = get_chatbot_settings()
         self.ollama_client = OllamaClient()
+        self.openai_client = OpenAICompatibleClient()
 
     def chat(
         self,
@@ -902,27 +903,40 @@ class ChatbotService:
         sources = list(dict.fromkeys(sources))
 
         append_session_message(session_id, "user", message)
-        ollama_reason = None
+        ai_reason = None
+        ai_provider = "fallback"
         reply = None
 
         if _should_force_guarded_response(intent):
-            ollama_reason = "Guarded response enabled for sensitive academic advising."
+            ai_reason = "Guarded response enabled for sensitive academic advising."
         elif self.settings.ai_enabled:
+            prompt = _build_prompt(
+                message=message,
+                intent=intent,
+                student_context=student_context,
+                document_snippets=document_snippets,
+                session_id=session_id,
+                role=role,
+                sources=sources,
+            )
             try:
-                reply = self.ollama_client.generate(
-                    system_prompt=build_system_prompt(),
-                    prompt=_build_prompt(
-                        message=message,
-                        intent=intent,
-                        student_context=student_context,
-                        document_snippets=document_snippets,
-                        session_id=session_id,
-                        role=role,
-                        sources=sources,
-                    ),
-                )
+                if self.settings.ai_provider in {"auto", "openai", "openai-compatible", "cloud"}:
+                    reply = self.openai_client.generate(system_prompt=build_system_prompt(), prompt=prompt)
+                    ai_provider = "openai-compatible"
+                elif self.settings.ai_provider == "ollama":
+                    reply = self.ollama_client.generate(system_prompt=build_system_prompt(), prompt=prompt)
+                    ai_provider = "ollama"
+            except OpenAICompatibleUnavailableError as exc:
+                ai_reason = str(exc)
+                if self.settings.ai_provider == "auto":
+                    try:
+                        reply = self.ollama_client.generate(system_prompt=build_system_prompt(), prompt=prompt)
+                        ai_provider = "ollama"
+                        ai_reason = None
+                    except OllamaUnavailableError as ollama_exc:
+                        ai_reason = f"{ai_reason}; {ollama_exc}"
             except OllamaUnavailableError as exc:
-                ollama_reason = str(exc)
+                ai_reason = str(exc)
 
         if not reply:
             reply = _fallback_response(
@@ -930,7 +944,7 @@ class ChatbotService:
                 student_context=student_context,
                 snippets=document_snippets,
                 message=message,
-                ollama_reason=ollama_reason,
+                ollama_reason=ai_reason,
             )
 
         append_session_message(session_id, "assistant", reply)
@@ -942,7 +956,9 @@ class ChatbotService:
             metadata={
                 "student_id": student_id,
                 "program_name": resolved_program_name,
-                "ollama_status": "ready" if reply and ollama_reason is None and self.settings.ai_enabled else "fallback",
+                "ollama_status": "ready" if ai_provider == "ollama" else "fallback",
+                "ai_provider": ai_provider,
+                "ai_status": "ready" if reply and ai_reason is None and self.settings.ai_enabled else "fallback",
                 "credit_progress_exact": student_context.credit_progress_exact if student_context else False,
                 "response_mode": "guarded" if _should_force_guarded_response(intent) else "llm_or_fallback",
             },

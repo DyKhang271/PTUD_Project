@@ -37,6 +37,7 @@ export function setTokenRefreshHandler(handler) {
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_TIMETABLE_API_BASE_URL || "http://localhost:8001",
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -44,6 +45,7 @@ export const api = axios.create({
 
 export const portalApi = axios.create({
   baseURL: import.meta.env.VITE_PORTAL_API_BASE_URL || "http://localhost:8000/api",
+  timeout: 15000,
   headers: {
     "Content-Type": "application/json",
   },

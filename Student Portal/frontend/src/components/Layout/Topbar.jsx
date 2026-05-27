@@ -23,6 +23,19 @@ export default function Topbar({ onToggleSidebar, isDesktopCollapsed, isDarkThem
   const [studyNotifs, setStudyNotifs] = useState([]);
   const dropdownRef = useRef(null);
 
+  const loadNotifications = () => {
+    getNotifications()
+      .then((res) => {
+        const data = Array.isArray(res.data) ? res.data : [];
+        const sorted = [...data].sort(
+          (left, right) => new Date(right.thoi_gian || 0) - new Date(left.thoi_gian || 0),
+        );
+        setStudyNotifs(sorted);
+        setUnreadCount(sorted.filter((n) => !n.da_doc).length);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     if (!user?.mssv) return;
 
@@ -30,16 +43,9 @@ export default function Topbar({ onToggleSidebar, isDesktopCollapsed, isDarkThem
       .then((res) => setStudent(res.data))
       .catch(() => {});
 
-    getNotifications()
-      .then((res) => {
-        const studyNotifsData = res.data.filter((n) => {
-          const lowered = n.tieu_de.toLowerCase();
-          return lowered.includes('gpa') || lowered.includes('điểm') || lowered.includes('học vụ');
-        });
-        setStudyNotifs(studyNotifsData);
-        setUnreadCount(studyNotifsData.filter((n) => !n.da_doc).length);
-      })
-      .catch(() => {});
+    loadNotifications();
+    const timer = setInterval(loadNotifications, 30000);
+    return () => clearInterval(timer);
   }, [user?.mssv]);
 
   useEffect(() => {
@@ -137,7 +143,10 @@ export default function Topbar({ onToggleSidebar, isDesktopCollapsed, isDarkThem
         <button 
           className={styles.notifBtn} 
           title="Thông báo"
-          onClick={() => setShowNotifModal(true)}
+          onClick={() => {
+            setShowNotifModal(true);
+            loadNotifications();
+          }}
         >
           🔔
           {unreadCount > 0 && <span className={styles.badge}>{unreadCount}</span>}
@@ -190,7 +199,7 @@ export default function Topbar({ onToggleSidebar, isDesktopCollapsed, isDarkThem
         <div className={styles.notifModalOverlay} onClick={() => setShowNotifModal(false)}>
           <div className={styles.notifModalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.notifModalHeader}>
-              <h3 className={styles.notifModalTitle}>🔔 Thông báo điểm học tập</h3>
+              <h3 className={styles.notifModalTitle}>🔔 Thông báo</h3>
               <button className={styles.notifModalClose} onClick={() => setShowNotifModal(false)}>✕</button>
             </div>
             <div className={styles.notifModalList}>

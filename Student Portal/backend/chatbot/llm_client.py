@@ -10,6 +10,50 @@ class OllamaUnavailableError(RuntimeError):
     pass
 
 
+class OpenAICompatibleUnavailableError(RuntimeError):
+    pass
+
+class OpenAICompatibleClient:
+    def __init__(self) -> None:
+        self.settings = get_chatbot_settings()
+
+    def is_configured(self) -> bool:
+        return bool(self.settings.openai_api_key)
+
+    def generate(self, *, system_prompt: str, prompt: str) -> str:
+        if not self.is_configured():
+            raise OpenAICompatibleUnavailableError("OPENAI_API_KEY is not configured.")
+
+        req = request.Request(
+            f"{self.settings.openai_base_url}/chat/completions",
+            data=json.dumps(
+                {
+                    "model": self.settings.openai_model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.2,
+                }
+            ).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.settings.openai_api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with request.urlopen(req, timeout=self.settings.ollama_timeout_seconds) as response:
+                body = response.read().decode("utf-8")
+                payload = json.loads(body) if body else {}
+        except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+            raise OpenAICompatibleUnavailableError("Khong the goi AI cloud luc nay.") from exc
+
+        choices = payload.get("choices") or []
+        content = ((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
+        if not content:
+            raise OpenAICompatibleUnavailableError("AI cloud khong tra ve noi dung hop le.")
+        return content
+
 class OllamaClient:
     def __init__(self) -> None:
         self.settings = get_chatbot_settings()

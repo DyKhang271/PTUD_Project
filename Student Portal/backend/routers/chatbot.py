@@ -26,8 +26,8 @@ def chat(msg: ChatMessage):
     )
     return {
         "reply": result.reply,
-        "sources": [],
-        "intent": None,
+        "sources": result.sources,
+        "intent": result.intent,
         "has_context": result.has_context,
         "metadata": result.metadata,
     }

@@ -8,6 +8,10 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class ChatbotSettings:
+    ai_provider: str
+    openai_base_url: str
+    openai_api_key: str
+    openai_model: str
     ollama_base_url: str
     ollama_model: str
     ollama_timeout_seconds: int
@@ -25,6 +29,10 @@ def get_chatbot_settings() -> ChatbotSettings:
     rag_directory = Path(os.getenv("RAG_DOCUMENTS_DIR", project_root / "RAG_docx"))
 
     return ChatbotSettings(
+        ai_provider=os.getenv("CHATBOT_AI_PROVIDER", "auto").strip().lower(),
+        openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434").rstrip("/"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
         ollama_timeout_seconds=int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "180")),

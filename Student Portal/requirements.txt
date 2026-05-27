@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+psycopg2-binary
+pypdf
+python-docx
+PyJWT>=2.8.0

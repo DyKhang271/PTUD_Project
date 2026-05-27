@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import student, schedule, notifications, grades, curriculum, chatbot, auth, admin, teacher, internal
+from routers import student, notifications, grades, curriculum, chatbot, auth, admin, teacher, internal
 from student_data_store import initialize_store
 
 app = FastAPI(title="Student Portal API", version="1.0.0")
@@ -24,7 +24,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(student.router)
-app.include_router(schedule.router)
 app.include_router(notifications.router)
 app.include_router(grades.router)
 app.include_router(curriculum.router)

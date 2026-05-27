@@ -4,7 +4,6 @@ import {
   getSystemConfig, updateSystemConfig,
   getAdminTeachers, createAdminTeacher, updateAdminTeacherPassword, updateAdminTeacher, deleteAdminTeacher, bulkImportAdminTeachers,
   getAdminTeacherAssignments, assignCourseToTeacher, removeCourseFromTeacher,
-  getAdminSchedule, createAdminSchedule, updateAdminSchedule, deleteAdminSchedule,
   getAdminNotifications, createAdminNotification, updateAdminNotification, deleteAdminNotification
 } from '../../services/api';
 import styles from './AdminDashboard.module.css';
@@ -17,7 +16,6 @@ export default function AdminDashboard() {
   // Data state
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
-  const [schedule, setSchedule] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [config, setConfig] = useState({ grading_weights: { diem_qt: 0.2, diem_gk: 0.3, diem_ck: 0.5 } });
 
@@ -30,11 +28,6 @@ export default function AdminDashboard() {
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [isEditingTeacher, setIsEditingTeacher] = useState(false);
   const [teacherForm, setTeacherForm] = useState({ username: '', password: '', name: '', department: '', title: '' });
-
-  // Schedule Modals
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
-  const [scheduleForm, setScheduleForm] = useState({ id: '', term: 'HK2 (2025 - 2026)', thu: 2, tiet_bat_dau: 1, tiet_ket_thuc: 3, mon: '', ma_mon: '', phong: '', giang_vien: '', mau: '#4a90d9' });
 
   // Notification Modals
   const [showNotifModal, setShowNotifModal] = useState(false);
@@ -55,18 +48,23 @@ export default function AdminDashboard() {
   const fileInputRef = useRef(null);
   const [uploadType, setUploadType] = useState('student');
 
-  const fetchData = async () => {
+  const fetchData = async (tab = activeTab) => {
     setLoading(true);
     try {
-      const [stuRes, teacherRes, schedRes, notifRes, confRes] = await Promise.all([
-        getAdminStudents(), getAdminTeachers(), getAdminSchedule(), getAdminNotifications(), getSystemConfig()
-      ]);
-      setStudents(stuRes.data || []);
-      setTeachers(teacherRes.data || []);
-      setSchedule(schedRes.data || []);
-      setNotifications(notifRes.data || []);
-      if (confRes.data && confRes.data.grading_weights) {
-        setConfig(confRes.data);
+      if (tab === 'students') {
+        const res = await getAdminStudents();
+        setStudents(res.data || []);
+      } else if (tab === 'teachers') {
+        const res = await getAdminTeachers();
+        setTeachers(res.data || []);
+      } else if (tab === 'notifications') {
+        const res = await getAdminNotifications();
+        setNotifications(res.data || []);
+      } else if (tab === 'settings') {
+        const res = await getSystemConfig();
+        if (res.data && res.data.grading_weights) {
+          setConfig(res.data);
+        }
       }
     } catch {
       showToast('Lỗi khi tải dữ liệu hệ thống.');
@@ -75,7 +73,7 @@ export default function AdminDashboard() {
     }
   };
 
-  useEffect(() => { fetchData() }, []);
+  useEffect(() => { fetchData(activeTab) }, [activeTab]);
 
   const showToast = (msg) => {
     setToast(msg);
@@ -238,33 +236,6 @@ export default function AdminDashboard() {
     } catch { showToast('Lỗi xoá phân công'); }
   };
 
-  // --- Schedule Handlers ---
-  const handleScheduleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      if (isEditingSchedule) {
-        await updateAdminSchedule(scheduleForm.id, scheduleForm);
-        showToast('Cập nhật Lớp học thành công');
-      } else {
-        await createAdminSchedule(scheduleForm);
-        showToast('Thêm Lớp học thành công');
-      }
-      setShowScheduleModal(false);
-      fetchData();
-    } catch (err) {
-      showToast(err?.response?.data?.detail || err?.response?.data?.message || 'Lỗi thao tác TKB');
-    }
-  };
-  
-  const handleDeleteSchedule = async (id) => {
-    if (!window.confirm('Xoá lớp học phần này khỏi TKB?')) return;
-    try {
-      await deleteAdminSchedule(id);
-      showToast('Đã xoá lớp học phần');
-      fetchData();
-    } catch { showToast('Lỗi xoá TKB'); }
-  };
-
   // --- Notification Handlers ---
   const handleNotifSubmit = async (e) => {
     e.preventDefault();
@@ -306,7 +277,6 @@ export default function AdminDashboard() {
         <div className={styles.sidebarTitle}>Admin Panel</div>
         <div className={`${styles.menuItem} ${activeTab === 'students' ? styles.menuItemActive : ''}`} onClick={() => switchTab('students')}>🎓 Sinh viên</div>
         <div className={`${styles.menuItem} ${activeTab === 'teachers' ? styles.menuItemActive : ''}`} onClick={() => switchTab('teachers')}>👨‍🏫 Giảng viên</div>
-        <div className={`${styles.menuItem} ${activeTab === 'schedule' ? styles.menuItemActive : ''}`} onClick={() => switchTab('schedule')}>📅 Thời khoá biểu</div>
         <div className={`${styles.menuItem} ${activeTab === 'notifications' ? styles.menuItemActive : ''}`} onClick={() => switchTab('notifications')}>📢 Thông báo</div>
         <div className={`${styles.menuItem} ${activeTab === 'settings' ? styles.menuItemActive : ''}`} onClick={() => switchTab('settings')}>⚙️ Cấu hình hệ thống</div>
       </aside>
@@ -388,54 +358,6 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
-          </>
-        )}
-
-        {activeTab === 'schedule' && (
-          <>
-            <div className={styles.headerRow}>
-              <div className={styles.headerTitleArea}>
-                <h2>Quản lý Thời khoá biểu</h2>
-                <div className={styles.headerSubtitle}>Điều phối phòng học, lớp học phần và giáo viên</div>
-              </div>
-              <div className={styles.headerActions}>
-                <button className={styles.primaryBtn} onClick={() => { setIsEditingSchedule(false); setScheduleForm({ id: '', term: 'HK2 (2025 - 2026)', thu: 2, tiet_bat_dau: 1, tiet_ket_thuc: 3, mon: '', ma_mon: '', phong: '', giang_vien: '', mau: '#4a90d9' }); setShowScheduleModal(true); }}>+ Tạo Lớp Mới</button>
-              </div>
-            </div>
-
-            {loading ? <div className={styles.card}><div className={styles.emptyCell}>Đang tải...</div></div> : Object.entries(
-              schedule.reduce((acc, curr) => {
-                const term = curr.term || 'HK2 (2025 - 2026)';
-                if (!acc[term]) acc[term] = [];
-                acc[term].push(curr);
-                return acc;
-              }, {})
-            ).map(([term, items]) => (
-              <div key={term} className={styles.card} style={{ marginBottom: '24px' }}>
-                <div style={{ padding: '16px 24px', background: 'var(--bg-hover)', borderBottom: '1px solid var(--border)', fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--primary)' }}>{term}</div>
-                <div className={styles.tableWrapper}>
-                  <table className={styles.table}>
-                    <thead><tr><th>Mã Môn</th><th>Tên Môn</th><th>Thời gian</th><th>Phòng</th><th>Giảng viên</th><th>Thao tác</th></tr></thead>
-                    <tbody>
-                      {items.map(sc => (
-                        <tr key={sc.id}>
-                          <td><strong>{sc.ma_mon}</strong></td>
-                          <td><span style={{ color: sc.mau, fontWeight:'600' }}>{sc.mon}</span></td>
-                          <td>Thứ {sc.thu} (Tiết {sc.tiet_bat_dau}-{sc.tiet_ket_thuc})</td>
-                          <td>{sc.phong}</td>
-                          <td>{sc.giang_vien}</td>
-                          <td style={{ display:'flex', gap:'8px' }}>
-                             <button className={`${styles.actionBtn} ${styles.editBtn}`} onClick={() => { setScheduleForm(sc); setIsEditingSchedule(true); setShowScheduleModal(true); }}>Sửa</button>
-                             <button className={`${styles.actionBtn} ${styles.deleteBtn}`} onClick={() => handleDeleteSchedule(sc.id)}>Xoá</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-            {!loading && schedule.length === 0 && <div className={styles.card}><div className={styles.emptyCell}>Chưa có lớp học phần nào.</div></div>}
           </>
         )}
 
@@ -551,35 +473,6 @@ export default function AdminDashboard() {
               <div className={styles.modalActions}>
                 <button type="button" className={styles.cancelBtn} onClick={() => setShowTeacherModal(false)}>Hủy</button>
                 <button type="submit" className={styles.submitBtn}>Lưu lại</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showScheduleModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modalContent}>
-            <h3>{isEditingSchedule ? 'Sửa Lớp học phần' : 'Thêm Lớp mới'}</h3>
-            <form onSubmit={handleScheduleSubmit}>
-              <div className={styles.formGrid}>
-                <div className={styles.formGroup}><label>Học kỳ</label><input required value={scheduleForm.term || ''} onChange={e=>setScheduleForm({...scheduleForm, term: e.target.value})} /></div>
-                <div className={styles.formGroup}><label>Mã Lớp Học Phần</label><input required value={scheduleForm.ma_mon} onChange={e=>setScheduleForm({...scheduleForm, ma_mon: e.target.value})} /></div>
-                <div className={styles.formGroup}><label>Tên Môn Học</label><input required value={scheduleForm.mon} onChange={e=>setScheduleForm({...scheduleForm, mon: e.target.value})} /></div>
-                <div className={styles.formGroup}><label>Giảng Viên</label><input required value={scheduleForm.giang_vien} onChange={e=>setScheduleForm({...scheduleForm, giang_vien: e.target.value})} /></div>
-                <div className={styles.formGroup}><label>Phòng</label><input required value={scheduleForm.phong} onChange={e=>setScheduleForm({...scheduleForm, phong: e.target.value})} /></div>
-                <div className={styles.formGroup}><label>Ngày Học (Thứ)</label>
-                  <select value={scheduleForm.thu} onChange={e=>setScheduleForm({...scheduleForm, thu: parseInt(e.target.value)})}>
-                    {[2,3,4,5,6,7].map(t => <option key={t} value={t}>Thứ {t}</option>)}
-                  </select>
-                </div>
-                <div className={styles.formGroup}><label>Màu hiển thị</label><input type="color" value={scheduleForm.mau} onChange={e=>setScheduleForm({...scheduleForm, mau: e.target.value})} /></div>
-                <div className={styles.formGroup}><label>Tiết Bắt đầu</label><input type="number" min="1" max="15" value={scheduleForm.tiet_bat_dau} onChange={e=>setScheduleForm({...scheduleForm, tiet_bat_dau: e.target.value})} /></div>
-                <div className={styles.formGroup}><label>Tiết Kết thúc</label><input type="number" min="1" max="15" value={scheduleForm.tiet_ket_thuc} onChange={e=>setScheduleForm({...scheduleForm, tiet_ket_thuc: e.target.value})} /></div>
-              </div>
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.cancelBtn} onClick={() => setShowScheduleModal(false)}>Hủy</button>
-                <button type="submit" className={styles.submitBtn}>Lưu Lớp</button>
               </div>
             </form>
           </div>

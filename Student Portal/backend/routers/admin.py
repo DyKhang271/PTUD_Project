@@ -1,6 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import List, Optional
 
 from student_data_store import (
     get_all_students_for_admin,
@@ -20,10 +19,6 @@ from student_data_store import (
     update_teacher_profile,
     delete_teacher_profile,
     bulk_add_teachers,
-    get_all_schedule_admin,
-    add_schedule_item,
-    update_schedule_item,
-    delete_schedule_item,
     get_all_notifications_admin,
     add_notification_admin,
     update_notification_admin,
@@ -126,32 +121,6 @@ def admin_assign_course(username: str, data: AssignCourseRequest):
 @router.delete("/teachers/{username}/assignments")
 def admin_remove_course(username: str, course_code: str, term: str):
     success, msg = remove_course_from_teacher(username, course_code, term)
-    return {"success": success, "message": msg}
-
-
-# API Schedule
-@router.get("/schedule")
-def get_admin_schedule():
-    return get_all_schedule_admin()
-
-@router.post("/schedule")
-def create_schedule(data: dict):
-    success, msg = add_schedule_item(data)
-    if not success:
-        raise HTTPException(status_code=400, detail=msg)
-    return {"success": success, "message": msg}
-
-@router.put("/schedule/{item_id}")
-def update_schedule(item_id: str, data: dict):
-    success, msg = update_schedule_item(item_id, data)
-    if not success:
-        status_code = 404 if "Kh" in msg and "t" in msg else 400
-        raise HTTPException(status_code=status_code, detail=msg)
-    return {"success": success, "message": msg}
-
-@router.delete("/schedule/{item_id}")
-def delete_schedule(item_id: str):
-    success, msg = delete_schedule_item(item_id)
     return {"success": success, "message": msg}
 
 

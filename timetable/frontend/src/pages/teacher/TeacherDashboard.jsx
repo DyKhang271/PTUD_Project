@@ -5,27 +5,47 @@ import StatusBadge from "../../components/StatusBadge";
 import { fetchAttendanceSummary, fetchTeacherSectionAttendanceSessions, fetchTeacherSections, fetchTeacherTodayClasses } from "../../services/teacherApi";
 
 export default function TeacherDashboard() {
-  const [state, setState] = useState({ loading: true, error: "", sections: [], today: [], sessions: [], summaries: [] });
+  const [state, setState] = useState({ loading: true, detailsLoading: false, error: "", sections: [], today: [], sessions: [], summaries: [] });
+
+  async function loadDetails(sections) {
+    if (!sections.length) {
+      return;
+    }
+
+    const [sessionResults, summaryResults] = await Promise.all([
+      Promise.allSettled(sections.map((section) => fetchTeacherSectionAttendanceSessions(section.id))),
+      Promise.allSettled(sections.map((section) => fetchAttendanceSummary(section.id))),
+    ]);
+
+    setState((prev) => ({
+      ...prev,
+      detailsLoading: false,
+      sessions: sessionResults.flatMap((result) => (result.status === "fulfilled" && Array.isArray(result.value) ? result.value : [])),
+      summaries: summaryResults.flatMap((result) => (result.status === "fulfilled" && Array.isArray(result.value) ? result.value : [])),
+    }));
+  }
 
   async function load() {
-    setState((prev) => ({ ...prev, loading: true, error: "" }));
+    setState((prev) => ({ ...prev, loading: true, detailsLoading: false, error: "" }));
     try {
-      const sections = await fetchTeacherSections();
-      const [today, sessionGroups, summaryGroups] = await Promise.all([
+      const [sections, today] = await Promise.all([
+        fetchTeacherSections(),
         fetchTeacherTodayClasses().catch(() => []),
-        Promise.all(sections.map((section) => fetchTeacherSectionAttendanceSessions(section.id).catch(() => []))),
-        Promise.all(sections.map((section) => fetchAttendanceSummary(section.id).catch(() => []))),
       ]);
       setState({
         loading: false,
+        detailsLoading: sections.length > 0,
         error: "",
         sections,
         today,
-        sessions: sessionGroups.flat(),
-        summaries: summaryGroups.flat(),
+        sessions: [],
+        summaries: [],
+      });
+      loadDetails(sections).catch(() => {
+        setState((prev) => ({ ...prev, detailsLoading: false }));
       });
     } catch (err) {
-      setState({ loading: false, error: err?.response?.data?.detail || "Không tải được dashboard giảng viên.", sections: [], today: [], sessions: [], summaries: [] });
+      setState({ loading: false, detailsLoading: false, error: err?.response?.data?.detail || "Không tải được dashboard giảng viên.", sections: [], today: [], sessions: [], summaries: [] });
     }
   }
 
