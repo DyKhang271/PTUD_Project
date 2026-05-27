@@ -291,7 +291,12 @@ def _detect_intent(message: str) -> str:
             best_score = score
             best_priority = priority
 
-    if best_score == 0 and _contains_any(normalized, ("xin chao", "hello", " hi ", " chao ")):
+    if best_score == 0 and (
+        "chao" in tokens
+        or "hello" in tokens
+        or "hi" in tokens
+        or "xin chao" in normalized
+    ):
         return "chao_hoi"
     if best_score < INTENT_MIN_SCORE:
         return "ngoai_pham_vi"
