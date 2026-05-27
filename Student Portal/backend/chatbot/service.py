@@ -912,7 +912,9 @@ class ChatbotService:
         ai_provider = "fallback"
         reply = None
 
-        if _should_force_guarded_response(intent):
+        if intent == "chao_hoi":
+            ai_reason = "Direct greeting response bypass."
+        elif _should_force_guarded_response(intent):
             ai_reason = "Guarded response enabled for sensitive academic advising."
         elif self.settings.ai_enabled:
             prompt = _build_prompt(
